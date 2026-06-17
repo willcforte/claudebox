@@ -46,8 +46,8 @@ cmd_up() {
 
   [ -n "$workspace" ] || die "profile $proj: workspace.host_path unset"
   [ -d "$workspace" ] || die "workspace not found: $workspace"
-  local pixi_cache="$HOME/.cache/claudebox/$name/pixi"
-  mkdir -p "$pixi_cache"
+  local state="$HOME/.cache/claudebox/$name"
+  mkdir -p "$state/pixi"
 
   local args=(run -d
     --name "$name" --hostname "$name" --label claudebox
@@ -55,9 +55,15 @@ cmd_up() {
     --security-opt no-new-privileges --cap-drop ALL
     -w "$workspace"
     --mount "type=bind,source=$workspace,target=$workspace"
-    --mount "type=bind,source=$pixi_cache,target=/home/dev/.pixi"
+    --mount "type=bind,source=$state/pixi,target=/home/dev/.pixi"
   )
-  [ "$claude_bind" = true ] && args+=(--mount "type=bind,source=$HOME/.claude,target=/home/dev/.claude")
+  # Shared ~/.claude dir (memory + auth) + a per-box ~/.claude.json (config), seeded once from the host
+  # so claude doesn't warn, kept box-local so host and box never clobber that hot file.
+  if [ "$claude_bind" = true ]; then
+    [ -f "$state/claude.json" ] || cp "$HOME/.claude.json" "$state/claude.json" 2>/dev/null || echo '{}' > "$state/claude.json"
+    args+=(--mount "type=bind,source=$HOME/.claude,target=/home/dev/.claude"
+           --mount "type=bind,source=$state/claude.json,target=/home/dev/.claude.json")
+  fi
 
   while IFS=$'\t' read -r h c; do
     [ -n "$h" ] && args+=(--mount "type=bind,source=$h,target=$c,readonly")
@@ -74,7 +80,7 @@ cmd_up() {
   echo ">> '$name' up. attach: claudebox attach $name"
 }
 
-cmd_attach() { docker exec -it "${1:?usage: claudebox attach <project>}" bash; }
+cmd_attach() { docker exec -it -e TERM -e COLORTERM "${1:?usage: claudebox attach <project>}" bash; }
 cmd_down()   { docker rm -f "${1:?usage: claudebox down <project>}" >/dev/null && echo ">> '$1' removed"; }
 cmd_status() { docker ps -a --filter label=claudebox --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'; }
 
