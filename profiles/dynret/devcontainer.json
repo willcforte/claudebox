@@ -1,0 +1,34 @@
+// dynret VSCode Dev Containers config. Copy to /home/will/dynret/.devcontainer/devcontainer.json.
+// Uses the Nix-built base image (no Dockerfile build). Mirrors `claudebox up dynret`.
+// Portable: workspace + ~/.claude via ${localWorkspaceFolder}/${localEnv:HOME}; uid matched to the host
+// by updateRemoteUserUID (so NO --cap-drop here — VSCode needs caps to remap the user at setup).
+// Memory resolves because the repo is bound 1:1 at its host path. Auto-mode is baked into the image.
+{
+  "name": "dynret",
+  "image": "claudebox-base:latest",
+  "workspaceFolder": "${localWorkspaceFolder}",
+  "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
+  "runArgs": [
+    "--gpus", "all",
+    // Publish on 0.0.0.0 so p20 tailscaled serves Rerun on the tailnet.
+    "-p", "0.0.0.0:9090:9090",
+    "-p", "0.0.0.0:9876:9876"
+  ],
+  "mounts": [
+    // RO host data — 1:1 so dynret configs/it1.local.toml resolve unchanged.
+    "source=/home/will/dev/persona_rl,target=/home/will/dev/persona_rl,type=bind,readonly",
+    "source=/home/will/dev/persona,target=/home/will/dev/persona,type=bind,readonly",
+    // Shared Claude memory + auth, RW (writeback; shared with host + other boxes).
+    "source=${localEnv:HOME}/.claude,target=/home/dev/.claude,type=bind",
+    // Persisted pixi cache (RW host bind, owned by the matched user).
+    "source=${localEnv:HOME}/.cache/claudebox/dynret/pixi,target=/home/dev/.pixi,type=bind"
+  ],
+  "initializeCommand": "mkdir -p ${localEnv:HOME}/.cache/claudebox/dynret/pixi",
+  "remoteUser": "dev",
+  "updateRemoteUserUID": true,
+  "customizations": {
+    "vscode": {
+      "extensions": ["anthropic.claude-code", "charliermarsh.ruff", "ms-python.python"]
+    }
+  }
+}

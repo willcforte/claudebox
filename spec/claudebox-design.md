@@ -21,13 +21,14 @@ Claude is confined to the container; the host is untouched. First consumer: `~/d
    - CUDA/torch/cuRobo are **absent** — they install in the pixi layer inside the container.
 2. **`claudebox` CLI** — one bash script, `bin/claudebox`. Subcommands:
    - `build` → `nix build .#baseImage` → `docker load`.
-   - `up <project>` → start the box (wiring below). **First run prompts** `bind ~/.claude? [Y/n]`,
-     remembered in `~/.config/claudebox/<project>.state`.
+   - `up <project>` → start the box (wiring below). **Fully non-interactive** — resumes an existing box,
+     or creates one (no `--rm`, so an accidental stop / p20 reboot just resumes; no commands needed).
    - `attach <project>` → `docker exec -it <project> bash`.
-   - `down <project>` → stop/rm. `status` → list running boxes.
+   - `down <project>` → remove the box. `status` → list boxes (running + stopped).
    - Reads `profiles/<project>/profile.toml` (via `yq`).
 3. **Per-project profile** — `profiles/<name>/`:
-   - `profile.toml` — image, workspace host path, ports, gpu flag, RO data mounts.
+   - `profile.toml` — image, workspace host path, ports, gpu flag, RO data mounts, `[claude] bind`
+     (default true; binds host `~/.claude` RW — **a setting, never a prompt**).
    - `pixi/gpu-feature.toml` — CUDA≥12.8 / torch cu128 / cuRobo overlay to merge into the project
      `pyproject.toml` (adds a `gpu` pixi environment).
    - `devcontainer.json` — VSCode config (copy to `<repo>/.devcontainer/`).
@@ -36,11 +37,12 @@ Claude is confined to the container; the host is untouched. First consumer: `~/d
 ## Wiring (portable)
 
 - **uid:** `--user "$(id -u):$(id -g)"` (CLI) / `updateRemoteUserUID: true` (VSCode). Never a literal uid.
+  CLI keeps `--cap-drop ALL`; the VSCode config omits it (uid remap at setup needs caps).
 - **repo:** bind **1:1 at its host path** (`source==target`). The project-memory slug derives from the
   workspace path, so 1:1 makes the in-box slug match the host (`-home-will-dynret`) → existing memories resolve.
 - **`~/.claude`:** bind **RW** at the container HOME (`${HOME}/.claude → /home/dev/.claude`). Same bytes as host
   → memory present; RW → Claude writes session/memory back and shares across boxes + host.
-- **pixi cache:** bind `~/.cache/devcontainers/<project>/pixi → /home/dev/.pixi` (host-owned → writable under the
+- **pixi cache:** bind `~/.cache/claudebox/<project>/pixi → /home/dev/.pixi` (host-owned → writable under the
   matched uid; persisted across respins).
 - **data (dynret):** RO binds of `~/dev/persona_rl`, `~/dev/persona`, **1:1** so dynret's
   `configs/it1.local.toml` absolute paths resolve unchanged.
@@ -55,6 +57,15 @@ Bind mounts are the same files on disk — there is no clone, nothing is lost. T
 1:1 workspace path → Claude finds the right project memory. RW → updates propagate back. (Git commit/push
 remains a separate backup/history concern, not the transition mechanism.)
 
+## Durability (restart / shutdown)
+
+All state lives in HOST bind mounts (repo, `~/.claude`, pixi cache) — never in the container.
+
+- **Container stopped/killed:** no loss; `claudebox up` resumes the same box (no `--rm`).
+- **p20 rebooted:** no loss; files are on p20's disk. `claudebox up` re-creates/resumes the box.
+- **Real loss vectors:** p20 disk/hardware failure with **unpushed commits** (→ push to GitHub), or work
+  saved to a container path that isn't a mount (→ keep work in the mounted repo). The pixi env is rebuildable.
+
 ## First consumer: dynret
 
 GPU on; ports 9090/9876; RO `persona_rl` + `persona`. cuRobo (no cu128 wheel) is the main risk → gate on
@@ -62,20 +73,13 @@ GPU on; ports 9090/9876; RO `persona_rl` + `persona`. cuRobo (no cu128 wheel) is
 
 ## Verify
 
-1. `claudebox build` → image builds, loads (`devcontainer-base:latest`).
+1. `claudebox build` → image builds, loads (`claudebox-base:latest`).
 2. `claudebox up dynret && claudebox attach dynret`.
 3. In-box: `nvidia-smi` → RTX 5090; `pixi run -e gpu python -c "import torch; print(torch.cuda.get_device_name())"` → RTX 5090.
 4. In-box: `claude` starts in auto-mode and sees the dynret memory.
 5. Rerun serves to wpc over the tailnet.
 
-## Changes from the current scaffold
-
-- **Revert** the hardcoded `will`/`1001`/`/home/will` edits in `base-image.nix` + `run.sh` → portable pattern.
-- **Replace** `scripts/build.sh`/`run.sh`/`teardown.sh` with `bin/claudebox` subcommands (single entry point); delete the standalone scripts.
-- **Move** auto-mode from the per-project `claude-settings.json` + `CLAUDE_CONFIG_DIR` override (which shadowed
-  memory) into the image-baked managed-settings; **delete** the now-orphaned `claude-settings.json` files.
-- **Fix** `devcontainer.json` (workspace `${localWorkspaceFolder}` 1:1, `~/.claude` RW, `updateRemoteUserUID`).
-
 ## Out of scope
 
-gh/x11 overlays, multi-user, non-p20 data paths, cuRobo source-build (separate task), pushing repos.
+gh/x11 overlays, multi-user, non-p20 data paths, cuRobo source-build (separate task), pushing repos,
+per-box branch isolation (would use git worktrees).

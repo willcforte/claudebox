@@ -1,0 +1,25 @@
+# Per-project container descriptor. Copy to profiles/<name>/profile.toml and fill in.
+# `claudebox up <name>` reads this to assemble the `docker run` line; nothing here is built by Nix.
+
+[project]
+name = "PROJECT_NAME"             # container + image tag
+image = "claudebox-base:latest"  # Nix-built base, loaded via 'claudebox build'
+
+[claude]
+bind = true                      # bind host ~/.claude RW (shared memory + auth). No prompt. Default: true.
+
+[workspace]
+# RW: the project repo. Bound 1:1 at this host path (so Claude's project-memory slug matches the host).
+host_path = "/home/will/PROJECT_NAME"
+
+[ports]
+# Published host:container. Host binds 0.0.0.0 so p20's tailscaled serves them on the tailnet.
+publish = []                     # e.g. ["9090:9090", "9876:9876"]
+
+[gpu]
+enabled = false                  # true -> adds --gpus all (nvidia runtime)
+
+# RO host mounts (read-only — auto-mode safety). ~/.claude is bound separately (opt-in) by claudebox.
+[[mounts]]
+host = "/abs/host/path"
+container = "/abs/container/path"

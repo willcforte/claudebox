@@ -1,0 +1,13 @@
+# Nix build outputs
+result
+result-*
+
+# pixi cache / envs (persisted as a docker volume, never checked in)
+.pixi/
+
+# local per-project overrides + secrets
+.devcontainer/*.local.*
+**/*.local.json
+**/*.local.toml
+.env
+*.secret

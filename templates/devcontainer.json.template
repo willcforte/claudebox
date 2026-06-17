@@ -1,0 +1,28 @@
+// Per-project VSCode Dev Containers config. Copy to <repo>/.devcontainer/devcontainer.json.
+// Uses the Nix-built base image directly. Mirror this with profiles/<name>/profile.toml so the
+// VSCode-launched and `claudebox up`-launched boxes match.
+// Portable: workspace + ~/.claude via ${localWorkspaceFolder}/${localEnv:HOME}; uid matched to the host
+// by updateRemoteUserUID (so NO --cap-drop here — VSCode needs caps to remap the user at setup).
+{
+  "name": "PROJECT_NAME",
+  "image": "claudebox-base:latest",
+  "workspaceFolder": "${localWorkspaceFolder}",
+  "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
+  "runArgs": [
+    "--gpus", "all"
+  ],
+  "mounts": [
+    // Shared Claude memory + auth, RW (writeback; shared with host + other boxes).
+    "source=${localEnv:HOME}/.claude,target=/home/dev/.claude,type=bind",
+    // Persisted pixi cache (RW host bind, owned by the matched user).
+    "source=${localEnv:HOME}/.cache/claudebox/PROJECT_NAME/pixi,target=/home/dev/.pixi,type=bind"
+  ],
+  "initializeCommand": "mkdir -p ${localEnv:HOME}/.cache/claudebox/PROJECT_NAME/pixi",
+  "remoteUser": "dev",
+  "updateRemoteUserUID": true,
+  "customizations": {
+    "vscode": {
+      "extensions": ["anthropic.claude-code"]
+    }
+  }
+}

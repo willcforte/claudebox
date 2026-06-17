@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# claudebox — build and run reusable sandboxed Claude Code dev containers.
+#
+# Sandbox: non-privileged, NO docker socket; host data RO; repo + ~/.claude bound 1:1 RW (shared
+# memory + writeback); pixi cache persisted. Portable: runs as the HOST uid/gid — nothing hardcoded.
+#
+# Durability: ALL real state lives in HOST bind mounts (the repo, ~/.claude, the pixi cache), never in
+# the container. The box is disposable — stopping it or rebooting p20 loses no work; `up` resumes it.
+# The only real loss vectors are a p20 disk failure with unpushed commits, or work saved to a path
+# inside the container that isn't one of the mounts.
+#
+# Usage: claudebox <build|up|attach|down|status> [project]
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+NIX_FLAGS=(--extra-experimental-features 'nix-command flakes')
+
+die() { echo "claudebox: $*" >&2; exit 1; }
+usage() { echo "usage: claudebox <build|up|attach|down|status> [project]"; exit "${1:-0}"; }
+need() { command -v "$1" >/dev/null || die "missing required tool: $1"; }
+
+profile() {
+  local t="$REPO/profiles/$1/profile.toml"
+  [ -f "$t" ] || die "no profile at $t (have: $(ls "$REPO/profiles" 2>/dev/null | tr '\n' ' '))"
+  printf '%s' "$t"
+}
+# get <toml> <expr> -> value, or "" if the path is absent (yq prints "null").
+get() { local v; v="$(yq -r "$2" "$1")"; [ "$v" = null ] && v=""; printf '%s' "$v"; }
+
+cmd_build() {
+  need nix; need docker
+  echo ">> nix build .#baseImage"
+  ( cd "$REPO" && nix "${NIX_FLAGS[@]}" build .#baseImage -o result )
+  echo ">> docker load < result"
+  docker load < "$REPO/result"
+}
+
+cmd_up() {
+  need docker; need yq
+  local proj="${1:?usage: claudebox up <project>}"
+  local toml; toml="$(profile "$proj")"
+  local name image workspace gpu claude_bind
+  name="$(get "$toml" '.project.name')"
+  image="$(get "$toml" '.project.image')"
+  workspace="$(get "$toml" '.workspace.host_path')"
+  gpu="$(get "$toml" '.gpu.enabled')"
+  claude_bind="$(get "$toml" '.claude.bind')"; [ -n "$claude_bind" ] || claude_bind=true
+
+  # Resume an existing box (survives an accidental stop / p20 reboot; no reconfigure needed).
+  if docker inspect "$name" >/dev/null 2>&1; then
+    if [ "$(docker inspect -f '{{.State.Running}}' "$name")" = true ]; then
+      echo ">> '$name' already up. attach: claudebox attach $name"
+    else
+      docker start "$name" >/dev/null
+      echo ">> '$name' resumed. attach: claudebox attach $name"
+    fi
+    return 0
+  fi
+
+  [ -n "$workspace" ] || die "profile $proj: workspace.host_path unset"
+  [ -d "$workspace" ] || die "workspace not found: $workspace"
+  local pixi_cache="$HOME/.cache/claudebox/$name/pixi"
+  mkdir -p "$pixi_cache"
+
+  local args=(run -d
+    --name "$name" --hostname "$name" --label claudebox
+    --user "$(id -u):$(id -g)"
+    --security-opt no-new-privileges --cap-drop ALL
+    -w "$workspace"
+    --mount "type=bind,source=$workspace,target=$workspace"
+    --mount "type=bind,source=$pixi_cache,target=/home/dev/.pixi"
+  )
+  # ~/.claude bind is a profile setting (default true) — no prompt, no extra commands on spin-up.
+  [ "$claude_bind" = true ] && args+=(--mount "type=bind,source=$HOME/.claude,target=/home/dev/.claude")
+
+  # RO data mounts, 1:1 by convention.
+  while IFS=$'\t' read -r h c; do
+    [ -n "$h" ] && args+=(--mount "type=bind,source=$h,target=$c,readonly")
+  done < <(yq -r '.mounts[]? | [.host, .container] | @tsv' "$toml")
+
+  # published ports, bound 0.0.0.0 so p20 tailscaled serves the tailnet.
+  while read -r p; do
+    [ -n "$p" ] && [ "$p" != null ] && args+=(-p "0.0.0.0:$p")
+  done < <(yq -r '.ports.publish[]?' "$toml")
+
+  [ "$gpu" = true ] && args+=(--gpus all)
+  args+=("$image" sleep infinity)
+
+  docker "${args[@]}" >/dev/null
+  echo ">> '$name' up. attach: claudebox attach $name"
+}
+
+cmd_attach() { docker exec -it "${1:?usage: claudebox attach <project>}" bash; }
+cmd_down()   { docker rm -f "${1:?usage: claudebox down <project>}" >/dev/null && echo ">> '$1' removed"; }
+cmd_status() { docker ps -a --filter label=claudebox --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'; }
+
+case "${1:-}" in
+  build)  cmd_build ;;
+  up)     shift; cmd_up "$@" ;;
+  attach) shift; cmd_attach "$@" ;;
+  down)   shift; cmd_down "$@" ;;
+  status) cmd_status ;;
+  -h|--help|"") usage 0 ;;
+  *) usage 1 ;;
+esac
