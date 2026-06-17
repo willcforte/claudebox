@@ -29,7 +29,6 @@ let
   ];
   rootfsSetup = pkgs.runCommand "rootfs-setup" { } ''
     mkdir -p $out/etc/claude-code $out/etc/claudebox $out/home/dev
-    chmod 0777 $out/home/dev
     echo "root:x:0:0:root:/root:/bin/bash" > $out/etc/passwd
     echo "dev:x:1000:1000:dev:/home/dev:/bin/bash" >> $out/etc/passwd
     echo "root:x:0:" > $out/etc/group
@@ -44,6 +43,11 @@ pkgs.dockerTools.buildLayeredImage {
   inherit name tag;
   fromImage = cudaBase;
   contents = tools ++ [ pkgs.dockerTools.binSh rootfsSetup ];
+  # A `chmod` in the runCommand store path is canonicalized back to root:root 0755, so make
+  # /home/dev world-writable here (post-assembly, under fakechroot) — the box runs as an arbitrary
+  # host uid that must write its home (e.g. .vscode-server for VS Code Dev Containers attach).
+  fakeRootCommands = "chmod 0777 /home/dev";
+  enableFakechroot = true;
   config = {
     User = "dev";
     Env = [
@@ -54,7 +58,7 @@ pkgs.dockerTools.buildLayeredImage {
       "HOME=/home/dev"
       "LANG=C.UTF-8"
       "PIXI_HOME=/home/dev/.pixi"
-      # /home/dev is read-only (Nix store); cache/data/history go to the writable .cache bind mount.
+      # /home/dev is world-writable (fakeRootCommands); cache/data/history go to the .cache bind mount so they persist across box recreation.
       "XDG_CACHE_HOME=/home/dev/.cache"
       "XDG_DATA_HOME=/home/dev/.cache/data"
       "XDG_STATE_HOME=/home/dev/.cache/state"

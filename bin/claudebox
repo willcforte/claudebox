@@ -59,12 +59,20 @@ cmd_up() {
   local state="$HOME/.cache/claudebox/$name"
   mkdir -p "$state/pixi" "$state/cache"
 
+  # Map the host uid to the `dev` user so VS Code Dev Containers attach resolves a named, writable
+  # home (a nameless uid makes it fall back to /root and fail). Bound RO over /etc/{passwd,group}.
+  local uid gid; uid="$(id -u)"; gid="$(id -g)"
+  printf 'root:x:0:0:root:/root:/bin/bash\ndev:x:%s:%s:dev:/home/dev:/bin/bash\n' "$uid" "$gid" > "$state/passwd"
+  printf 'root:x:0:\ndev:x:%s:\n' "$gid" > "$state/group"
+
   local args=(run -d
     --name "$name" --hostname "$name" --label claudebox
-    --user "$(id -u):$(id -g)"
+    --user "$uid:$gid"
     --security-opt no-new-privileges --cap-drop ALL
     -w "$workspace"
     --mount "type=bind,source=$workspace,target=$workspace"
+    --mount "type=bind,source=$state/passwd,target=/etc/passwd,readonly"
+    --mount "type=bind,source=$state/group,target=/etc/group,readonly"
     --mount "type=bind,source=$state/pixi,target=/home/dev/.pixi"
     --mount "type=bind,source=$state/cache,target=/home/dev/.cache"
   )

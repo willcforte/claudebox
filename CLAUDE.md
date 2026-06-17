@@ -35,9 +35,14 @@ and constructs the `docker run` args. No config file outside of profiles and `fl
   `/lib64/ld-linux-x86-64.so.2`, which doesn't exist in a scratch Nix image. The fix is
   `fromImage = <nvidia/cuda FHS base>` in `buildLayeredImage`. See
   `.claude/research/nix-docker-cuda-gpu.md` for full analysis.
-- **Runtime uid match.** The box runs as `--user "$(id -u):$(id -g)"` (CLI) or
-  `updateRemoteUserUID: true` (VSCode). The base image has a `dev` user at uid 1000 and a
-  world-writable `/home/dev`; the runtime uid overrides it without breaking home dir access.
+- **Runtime uid match + VS Code attach.** The box runs as `--user "$(id -u):$(id -g)"` (CLI) or
+  `updateRemoteUserUID: true` (VSCode). `/home/dev` must be genuinely world-writable: a `chmod` in
+  the `runCommand` store path is canonicalized back to root:root 0755 and silently does nothing, so
+  it is set via `fakeRootCommands` in `buildLayeredImage`. For VS Code "Attach to Running Container"
+  the runtime uid must *also* resolve to a named user — a nameless uid makes VS Code fall back to
+  `/root` and fail (`mkdir: cannot create directory '/root'`). The CLI therefore generates a per-box
+  `/etc/passwd`+`/etc/group` mapping the host uid to `dev` (home `/home/dev`) and binds them RO. Keep
+  the uid out of the image (`$(id -u)` in the CLI), never a literal.
 - **Per-box seeded `~/.claude.json`.** The CLI seeds `~/.cache/claudebox/<name>/claude.json`
   once from the host `~/.claude.json`, then binds it at `/home/dev/.claude.json`. This keeps the
   host and box from clobbering each other's hot config file while still giving Claude a valid
