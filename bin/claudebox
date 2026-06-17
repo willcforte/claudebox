@@ -34,8 +34,8 @@ cmd_up() {
   gpu="$(get "$toml" '.gpu.enabled')"
   claude_bind="$(get "$toml" '.claude.bind')"; [ -n "$claude_bind" ] || claude_bind=true
 
-  if docker inspect "$name" >/dev/null 2>&1; then
-    if [ "$(docker inspect -f '{{.State.Running}}' "$name")" = true ]; then
+  if docker container inspect "$name" >/dev/null 2>&1; then
+    if [ "$(docker container inspect -f '{{.State.Running}}' "$name")" = true ]; then
       echo ">> '$name' already up. attach: claudebox attach $name"
     else
       docker start "$name" >/dev/null
