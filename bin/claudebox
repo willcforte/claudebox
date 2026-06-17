@@ -25,7 +25,16 @@ cmd_build() {
 
 cmd_up() {
   need docker; need yq
-  local proj="${1:?usage: claudebox up <project>}"
+  local proj="" attach=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -a|--attach) attach=1 ;;
+      -*) die "unknown flag: $1 (usage: claudebox up <project> [-a|--attach])" ;;
+      *) proj="$1" ;;
+    esac
+    shift
+  done
+  [ -n "$proj" ] || die "usage: claudebox up <project> [-a|--attach]"
   local toml; toml="$(profile "$proj")"
   local name image workspace gpu claude_bind
   name="$(get "$toml" '.project.name')"
@@ -41,6 +50,7 @@ cmd_up() {
       docker start "$name" >/dev/null
       echo ">> '$name' resumed. attach: claudebox attach $name"
     fi
+    [ -n "$attach" ] && cmd_attach "$name"
     return 0
   fi
 
@@ -85,6 +95,7 @@ cmd_up() {
 
   docker "${args[@]}" >/dev/null
   echo ">> '$name' up. attach: claudebox attach $name"
+  [ -n "$attach" ] && cmd_attach "$name"
 }
 
 cmd_attach() { docker exec -it -e TERM -e COLORTERM "${1:?usage: claudebox attach <project>}" bash; }
