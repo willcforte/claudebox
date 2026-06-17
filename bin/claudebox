@@ -24,24 +24,34 @@ cmd_build() {
 }
 
 cmd_up() {
-  need docker; need yq
-  local proj="" attach=""
+  need docker
+  local proj="" attach="" name_override=""
   while [ $# -gt 0 ]; do
     case "$1" in
       -a|--attach) attach=1 ;;
-      -*) die "unknown flag: $1 (usage: claudebox up <project> [-a|--attach])" ;;
+      --name) shift; name_override="${1:?--name needs a value}" ;;
+      -*) die "unknown flag: $1 (usage: claudebox up [project] [--name N] [-a|--attach])" ;;
       *) proj="$1" ;;
     esac
     shift
   done
-  [ -n "$proj" ] || die "usage: claudebox up <project> [-a|--attach]"
-  local toml; toml="$(profile "$proj")"
-  local name image workspace gpu claude_bind
-  name="$(get "$toml" '.project.name')"
-  image="$(get "$toml" '.project.image')"
-  workspace="$(get "$toml" '.workspace.host_path')"
-  gpu="$(get "$toml" '.gpu.enabled')"
-  claude_bind="$(get "$toml" '.claude.bind')"; [ -n "$claude_bind" ] || claude_bind=true
+
+  # No project: box the current directory with working defaults; a profile fills these from its TOML.
+  local name="" image="" workspace="" gpu="" claude_bind="" toml=""
+  workspace="$PWD"; name="$(basename "$PWD")"
+  if [ -n "$proj" ]; then
+    need yq
+    toml="$(profile "$proj")"
+    name="$(get "$toml" '.project.name')"
+    image="$(get "$toml" '.project.image')"
+    workspace="$(get "$toml" '.workspace.host_path')"
+    gpu="$(get "$toml" '.gpu.enabled')"
+    claude_bind="$(get "$toml" '.claude.bind')"
+  fi
+  [ -n "$name_override" ] && name="$name_override"
+  [ -n "$image" ] || image="claudebox-base:latest"
+  [ -n "$gpu" ] || gpu=false
+  [ -n "$claude_bind" ] || claude_bind=true
 
   if docker container inspect "$name" >/dev/null 2>&1; then
     if [ "$(docker container inspect -f '{{.State.Running}}' "$name")" = true ]; then
@@ -57,13 +67,17 @@ cmd_up() {
   [ -n "$workspace" ] || die "profile $proj: workspace.host_path unset"
   [ -d "$workspace" ] || die "workspace not found: $workspace"
   local state="$HOME/.cache/claudebox/$name"
-  mkdir -p "$state/pixi" "$state/cache"
+  mkdir -p "$state/pixi" "$state/cache" "$state/vscode-server/data/Machine"
 
   # Map the host uid to the `dev` user so VS Code Dev Containers attach resolves a named, writable
   # home (a nameless uid makes it fall back to /root and fail). Bound RO over /etc/{passwd,group}.
   local uid gid; uid="$(id -u)"; gid="$(id -g)"
   printf 'root:x:0:0:root:/root:/bin/bash\ndev:x:%s:%s:dev:/home/dev:/bin/bash\n' "$uid" "$gid" > "$state/passwd"
   printf 'root:x:0:\ndev:x:%s:\n' "$gid" > "$state/group"
+
+  # Declarative VS Code machine settings (all workspaces, any profile) on a persisted .vscode-server,
+  # so Python tooling works without manual per-box setup and extensions survive recreation.
+  cp "$REPO/assets/vscode-machine-settings.json" "$state/vscode-server/data/Machine/settings.json"
 
   local args=(run -d
     --name "$name" --hostname "$name" --label claudebox
@@ -75,6 +89,7 @@ cmd_up() {
     --mount "type=bind,source=$state/group,target=/etc/group,readonly"
     --mount "type=bind,source=$state/pixi,target=/home/dev/.pixi"
     --mount "type=bind,source=$state/cache,target=/home/dev/.cache"
+    --mount "type=bind,source=$state/vscode-server,target=/home/dev/.vscode-server"
   )
   # Shared ~/.claude dir (memory + auth) + a per-box ~/.claude.json (config), seeded once from the host
   # so claude doesn't warn, kept box-local so host and box never clobber that hot file.
@@ -84,17 +99,19 @@ cmd_up() {
            --mount "type=bind,source=$state/claude.json,target=/home/dev/.claude.json")
   fi
 
-  while IFS=$'\t' read -r h c; do
-    [ -n "$h" ] && args+=(--mount "type=bind,source=$h,target=$c,readonly")
-  done < <(yq -r '.mounts[]? | [.host, .container] | @tsv' "$toml")
-
   local ports_str=""
-  while read -r p; do
-    if [ -n "$p" ] && [ "$p" != null ]; then
-      args+=(-p "0.0.0.0:$p")
-      ports_str="${ports_str:+$ports_str, }${p%%:*}"
-    fi
-  done < <(yq -r '.ports.publish[]?' "$toml")
+  if [ -n "$toml" ]; then
+    while IFS=$'\t' read -r h c; do
+      [ -n "$h" ] && args+=(--mount "type=bind,source=$h,target=$c,readonly")
+    done < <(yq -r '.mounts[]? | [.host, .container] | @tsv' "$toml")
+
+    while read -r p; do
+      if [ -n "$p" ] && [ "$p" != null ]; then
+        args+=(-p "0.0.0.0:$p")
+        ports_str="${ports_str:+$ports_str, }${p%%:*}"
+      fi
+    done < <(yq -r '.ports.publish[]?' "$toml")
+  fi
 
   [ "$gpu" = true ] && args+=(--gpus all)
   args+=(-e "CLAUDEBOX_NAME=$name" -e "CLAUDEBOX_WORKSPACE=$workspace"
@@ -103,7 +120,7 @@ cmd_up() {
 
   docker "${args[@]}" >/dev/null
   echo ">> '$name' up. attach: claudebox attach $name"
-  [ -n "$attach" ] && cmd_attach "$name"
+  if [ -n "$attach" ]; then cmd_attach "$name"; fi
 }
 
 cmd_attach() { docker exec -it -e TERM -e COLORTERM "${1:?usage: claudebox attach <project>}" bash; }

@@ -1,0 +1,6 @@
+{
+  "python.useEnvironmentsExtension": false,
+  "python.defaultInterpreterPath": "${workspaceFolder}/.pixi/envs/default/bin/python",
+  "python.venvFolders": [],
+  "python.terminal.activateEnvironment": false
+}
