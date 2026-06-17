@@ -23,6 +23,7 @@ let
     shellcheck shfmt
     starship zoxide
     curl wget cacert
+    nodejs
     pixi
     claude-code
   ];
