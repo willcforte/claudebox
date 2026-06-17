@@ -3,7 +3,7 @@
 # all real state lives in host bind mounts, so the box is disposable. Usage: see usage().
 set -euo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"  # resolve symlinks (PATH install)
 NIX_FLAGS=(--extra-experimental-features 'nix-command flakes')
 
 die() { echo "claudebox: $*" >&2; exit 1; }
