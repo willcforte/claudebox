@@ -1,0 +1,7 @@
+# shellcheck shell=bash
+# claudebox interactive shell rc (baked to /home/dev/.bashrc).
+[ -f /etc/claudebox/banner.sh ] && . /etc/claudebox/banner.sh
+command -v starship >/dev/null 2>&1 && eval "$(starship init bash)"
+command -v zoxide   >/dev/null 2>&1 && eval "$(zoxide init bash)"
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'

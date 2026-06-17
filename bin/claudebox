@@ -69,12 +69,18 @@ cmd_up() {
     [ -n "$h" ] && args+=(--mount "type=bind,source=$h,target=$c,readonly")
   done < <(yq -r '.mounts[]? | [.host, .container] | @tsv' "$toml")
 
+  local ports_str=""
   while read -r p; do
-    [ -n "$p" ] && [ "$p" != null ] && args+=(-p "0.0.0.0:$p")
+    if [ -n "$p" ] && [ "$p" != null ]; then
+      args+=(-p "0.0.0.0:$p")
+      ports_str="${ports_str:+$ports_str, }${p%%:*}"
+    fi
   done < <(yq -r '.ports.publish[]?' "$toml")
 
   [ "$gpu" = true ] && args+=(--gpus all)
-  args+=("$image" sleep infinity)
+  args+=(-e "CLAUDEBOX_NAME=$name" -e "CLAUDEBOX_WORKSPACE=$workspace"
+         -e "CLAUDEBOX_GPU=$gpu" -e "CLAUDEBOX_PORTS=${ports_str:-none}"
+         "$image" sleep infinity)
 
   docker "${args[@]}" >/dev/null
   echo ">> '$name' up. attach: claudebox attach $name"

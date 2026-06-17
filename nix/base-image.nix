@@ -27,13 +27,16 @@ let
     claude-code
   ];
   rootfsSetup = pkgs.runCommand "rootfs-setup" { } ''
-    mkdir -p $out/etc/claude-code $out/home/dev
+    mkdir -p $out/etc/claude-code $out/etc/claudebox $out/home/dev
     chmod 0777 $out/home/dev
     echo "root:x:0:0:root:/root:/bin/bash" > $out/etc/passwd
     echo "dev:x:1000:1000:dev:/home/dev:/bin/bash" >> $out/etc/passwd
     echo "root:x:0:" > $out/etc/group
     echo "dev:x:1000:" >> $out/etc/group
     echo '{"permissions":{"defaultMode":"bypassPermissions"}}' > $out/etc/claude-code/managed-settings.json
+    cp ${../assets/banner.sh} $out/etc/claudebox/banner.sh
+    cp ${../assets/bashrc}    $out/home/dev/.bashrc
+    chmod 0644 $out/etc/claudebox/banner.sh $out/home/dev/.bashrc
   '';
 in
 pkgs.dockerTools.buildLayeredImage {
