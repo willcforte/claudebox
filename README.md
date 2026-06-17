@@ -1,41 +1,39 @@
 # claudebox
 
-Reusable, sandboxed Docker dev boxes for running **Claude Code in no-prompt auto-mode** with GPU and
-shared memory. The container is the security boundary, so Claude runs unattended without touching the
-host. One reusable base image; one `claudebox` CLI; a thin profile per project.
-
-Remote-in flow: **`wpc → ssh p20 → VSCode Dev Containers (or claudebox attach) → Claude + GPU + viz`**.
+Sandboxed Docker dev boxes for running **Claude Code in no-prompt auto-mode** with GPU and shared
+memory. The container is the security boundary; Claude runs unattended without touching the host.
+One reusable base image; one `claudebox` CLI; a thin profile per project.
 
 ---
 
-## Quickstart (on p20)
+## Quickstart
 
 **One-time setup**
 
 ```bash
 # put the CLI on PATH
-ln -sf ~/dev/claudebox/bin/claudebox ~/.local/bin/claudebox      # ensure ~/.local/bin is on $PATH
+ln -sf ~/dev/claudebox/bin/claudebox ~/.local/bin/claudebox   # ensure ~/.local/bin is on $PATH
 
 # build the base image (Nix base + nvidia/cuda; slow first run, then cached)
 claudebox build
 
 # (VSCode only) drop the dev-container config into the project repo
-cp ~/dev/claudebox/profiles/dynret/devcontainer.json ~/dynret/.devcontainer/devcontainer.json
+cp ~/dev/claudebox/profiles/<project>/devcontainer.json ~/<project>/.devcontainer/devcontainer.json
 ```
 
 **Each session — terminal**
 
 ```bash
-claudebox up dynret          # start (or resume) the box
-claudebox attach dynret      # shell in
+claudebox up <project>       # start (or resume) the box
+claudebox attach <project>   # shell in
 # inside:
 claude                       # auto-mode, sees your shared memory
 ```
 
-**Each session — VSCode** (the primary flow)
+**Each session — VSCode**
 
-1. On wpc: VSCode → Remote-SSH → p20
-2. Open `~/dynret` → **Reopen in Container**
+1. VSCode → Remote-SSH → host
+2. Open `~/<project>` → **Reopen in Container**
 3. The box comes up (GPU + shared memory + auto-mode); work normally.
 
 ---
@@ -45,68 +43,82 @@ claude                       # auto-mode, sees your shared memory
 | Command | Does |
 |---|---|
 | `claudebox build` | Build the Nix base image → `docker load` (`claudebox-base:latest`) |
-| `claudebox up <project>` | Start the box, or resume it if it already exists (no `--rm`) |
+| `claudebox up <project>` | Start the box, or resume it if it already exists |
 | `claudebox attach <project>` | Open a shell in the box (`docker exec -it … bash`) |
-| `claudebox down <project>` | Remove the box (state lives on the host, so nothing is lost) |
+| `claudebox down <project>` | Remove the box (state lives on the host, nothing is lost) |
 | `claudebox status` | List boxes (running + stopped) |
 
 ---
 
 ## How a box is wired
 
-**Mounts** (defined in `profiles/<name>/profile.toml`; example is dynret):
+**Mounts** (defined in `profiles/<name>/profile.toml`):
 
-| Host path | In box | Mode | Purpose |
+| Host path | In-box path | Mode | Purpose |
 |---|---|---|---|
-| `/home/will/dynret` | same (1:1) | RW | the project repo (your live copy, not a clone) |
+| `<workspace.host_path>` | same (1:1) | RW | project repo (live copy, not a clone) |
 | `~/.claude` | `/home/dev/.claude` | RW | shared memory + auth (writeback to host) |
 | `~/.cache/claudebox/<name>/pixi` | `/home/dev/.pixi` | RW | persisted pixi cache |
-| `~/dev/persona_rl`, `~/dev/persona` | same (1:1) | RO | it1 robot model + BVH data dynret needs |
+| any `[[mounts]]` entries | same or as configured | RO | extra data the project needs |
+
+> Profiles are user/host-specific (absolute paths). The `dynret` profile ships as an example; copy
+> and edit it for your own project.
 
 Nothing else of the host is visible.
 
-- **Runs as your host uid/gid** — `--user "$(id -u):$(id -g)"` (CLI) / `updateRemoteUserUID` (VSCode).
-  Nothing hardcodes a uid, so it's portable. (`whoami` may say *"I have no name!"* — harmless.)
-- **Repo bound 1:1 at its host path** so Claude's project-memory slug matches the host and your
-  existing memories resolve.
+- **Runs as your host uid/gid** — `--user "$(id -u):$(id -g)"` (CLI) / `updateRemoteUserUID`
+  (VSCode). Nothing hardcodes a uid. (`whoami` may say *"I have no name!"* — harmless.)
+- **Repo bound 1:1 at its host path** so Claude's project-memory slug matches the host and
+  existing memories resolve correctly.
 - **Auto-mode** is baked into the image at `/etc/claude-code/managed-settings.json`
-  (`bypassPermissions`) — container-only, never shadows the bound `~/.claude` memory, never leaks to
-  the host. Toggle the `~/.claude` bind itself via `[claude] bind` in the profile (default `true`).
-- **Sandbox:** non-privileged, `--cap-drop ALL`, `--security-opt no-new-privileges`, **no docker
-  socket**. (The VSCode config omits `--cap-drop` because VSCode needs caps to remap the user.)
-- **GPU:** `--gpus all`. The base is FHS (`nvidia/cuda:12.8.1-devel-ubuntu24.04`) so the NVIDIA runtime
-  injects the host driver + `libcuda`. PyTorch (cu128) brings its own CUDA runtime; the host supplies
-  the driver. RTX 5090 / Blackwell (sm_120) needs CUDA ≥12.8 + torch ≥2.7.
+  (`bypassPermissions`) — container-only, never shadows the bound `~/.claude`, never leaks to
+  the host. Toggle the bind itself via `[claude] bind = false` in the profile.
+- **Sandbox:** non-privileged, `--cap-drop ALL`, `--security-opt no-new-privileges`, no docker
+  socket. (The VSCode config omits `--cap-drop` because VSCode needs caps to remap the user.)
+- **GPU:** `--gpus all`. The base is FHS (`nvidia/cuda:12.8.1-devel-ubuntu24.04`) so the NVIDIA
+  runtime injects the host driver + `libcuda.so`. PyTorch (cu128) brings its own CUDA runtime; the
+  host supplies the driver. RTX 5090 / Blackwell (sm_120) needs CUDA ≥ 12.8 + PyTorch ≥ 2.7.
+- **Ports:** published on `0.0.0.0`; served to the tailnet by the host's `tailscaled`.
 
 ---
 
-## Durability — what survives a shutdown
+## Durability
 
 All real state lives in **host bind mounts**, never in the container:
 
 - **Container stopped/killed:** nothing lost; `claudebox up` resumes the same box.
-- **p20 rebooted:** nothing lost; files are on p20's disk; `up` re-creates/resumes it.
-- **Real loss only from:** p20 disk failure with **unpushed commits** (→ push to GitHub), or work
-  saved to a container path that isn't a mount (→ keep work in the repo). The pixi env is rebuildable.
+- **Host rebooted:** nothing lost; files are on the host disk; `up` re-creates/resumes the box.
+- **Real loss only from:** disk failure with **unpushed commits** (→ push to GitHub), or work
+  saved to a container path that isn't a mount (→ keep work in the repo). The pixi env is
+  rebuildable.
 
 ---
 
 ## Networking
 
-- **Internet: yes** — default Docker bridge (NAT through p20). `claude`, `pixi install`, `git`,
-  cuRobo's source `git clone` all work.
+- **Internet: yes** — default Docker bridge (NAT through host). `claude`, `pixi install`, `git`
+  all work.
 - **Tailscale:** the box is **not** a tailnet node. Viz still reaches the tailnet because the box
-  publishes its ports on `0.0.0.0` and **p20's `tailscaled` serves them** — open
-  `http://persona-0020-2:9090?url=rerun%2Bhttp%3A%2F%2Fpersona-0020-2%3A9876%2Fproxy` on wpc.
+  publishes ports on `0.0.0.0` and the **host's `tailscaled` serves them**.
 
 ---
 
-## Add a new project
+## Set up a new project
 
 ```bash
-cp templates/project.toml.template      profiles/<name>/profile.toml      # edit name/workspace/ports/mounts
-cp templates/devcontainer.json.template profiles/<name>/devcontainer.json # edit name/ports/data mounts
-# GPU projects: add a profiles/<name>/pixi/gpu-feature.toml and merge it into the project's pyproject.toml
+# 1. Create the profile
+cp templates/project.toml.template profiles/<name>/profile.toml
+#    → edit: name, workspace host_path, ports, gpu.enabled, [[mounts]]
+
+# 2. VSCode dev-container config
+cp templates/devcontainer.json.template profiles/<name>/devcontainer.json
+#    → edit: name, runArgs (ports/gpu), mounts
+cp profiles/<name>/devcontainer.json ~/<name>/.devcontainer/devcontainer.json
+
+# 3. GPU projects only
+#    add profiles/<name>/pixi/gpu-feature.toml and merge it into the project's pyproject.toml
+
+# 4. Start the box
 claudebox up <name>
 ```
 
@@ -115,19 +127,24 @@ claudebox up <name>
 ## Layout
 
 ```
-bin/claudebox                 the CLI (build/up/attach/down/status)
-flake.nix, nix/base-image.nix Nix tooling layered on the pinned FHS CUDA base
-profiles/<name>/              profile.toml, devcontainer.json, pixi/gpu-feature.toml
-templates/                    project.toml + devcontainer.json templates for new projects
-spec/claudebox-design.md      full design rationale
-.claude/research/             nix-docker-cuda-gpu.md — why the base is FHS, not pure Nix
+bin/claudebox                  CLI (build/up/attach/down/status)
+flake.nix, nix/base-image.nix  Nix tooling layered on the pinned FHS CUDA base
+profiles/<name>/               profile.toml, devcontainer.json, pixi/gpu-feature.toml
+profiles/dynret/               example profile
+templates/                     project.toml + devcontainer.json templates
+spec/claudebox-design.md       full design rationale
+.claude/research/              nix-docker-cuda-gpu.md — why the base is FHS, not pure Nix
 ```
+
+---
 
 ## Notes
 
-- **Git identity in-box:** only `~/.claude` is mounted, not `~/.gitconfig`, so commits made *inside*
-  the box have no author. Add a `~/.gitconfig` mount to the profile if you commit from in-box.
-- **cuRobo** has no cu128 wheel — install from source *after* `torch.cuda.get_device_name()` confirms
-  the RTX 5090: `pixi run pip install --no-build-isolation git+https://github.com/NVlabs/curobo.git`.
-- Updating the base CUDA image: change the digest in `nix/base-image.nix`, set `hash` to
-  `pkgs.lib.fakeHash`, run `claudebox build` once, paste the reported hash back.
+- **Git identity in-box:** only `~/.claude` is mounted, not `~/.gitconfig`, so commits made
+  inside the box have no author. Add a `~/.gitconfig` mount to the profile if you commit from
+  in-box.
+- **cuRobo** has no cu128 wheel — install from source after `torch.cuda.get_device_name()`
+  confirms the GPU:
+  `pixi run pip install --no-build-isolation git+https://github.com/NVlabs/curobo.git`
+- **Updating the base CUDA image:** change the digest in `nix/base-image.nix`, set `hash` to
+  `pkgs.lib.fakeHash`, run `claudebox build`, paste the reported hash back.
