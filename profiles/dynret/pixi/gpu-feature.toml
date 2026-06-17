@@ -1,34 +1,21 @@
-# dynret GPU feature overlay — the CUDA/torch/cuRobo layer that runs INSIDE the container.
-#
-# pixi reads ONE manifest per workspace, so this is NOT loaded standalone: merge these tables into
-# dynret's /home/will/dynret/pyproject.toml under [tool.pixi.*], then `pixi install -e gpu` inside the
-# container. Kept here (in the container repo) so the GPU stack is versioned with the sandbox, separate
-# from dynret's CPU-only base env. UNVERIFIED — cannot build; see README "Unverified / risks".
-#
-# Blackwell (RTX 5090, sm_120) REQUIRES CUDA >= 12.8 and a torch built for cu128 (>= 2.7). cuRobo is
-# unpackaged on conda-forge and pins an older torch/CUDA -> the hard part: it likely needs a source
-# build (pip install from git, no build isolation) against this torch. De-risk torch-sees-the-5090
-# BEFORE attempting cuRobo (HANDOFF watch-out).
+# dynret GPU overlay (CUDA/torch/cuRobo, runs inside the box). Merge into ~/dynret/pyproject.toml,
+# then `pixi install -e gpu`. Blackwell (RTX 5090, sm_120) needs CUDA>=12.8 + torch cu128. UNVERIFIED.
 
 [tool.pixi.feature.gpu.system-requirements]
 cuda = "12.8"
 
-# CUDA toolkit ONLY (compiler/libs) — never the driver; the host nvidia runtime injects that.
 [tool.pixi.feature.gpu.dependencies]
 cuda-version = ">=12.8"
 cuda-toolkit = ">=12.8"
 
-# torch cu128 wheels come from the PyTorch index, not conda-forge.
 [tool.pixi.feature.gpu.pypi-options]
 extra-index-urls = ["https://download.pytorch.org/whl/cu128"]
 
 [tool.pixi.feature.gpu.pypi-dependencies]
 torch = ">=2.7"
-# cuRobo: no PyPI wheel for cu128. Install from source inside the container after torch is verified:
+# cuRobo has no cu128 wheel — install from source after torch is verified (primary integration risk):
 #   pixi run pip install --no-build-isolation git+https://github.com/NVlabs/curobo.git
-# (Left commented because it cannot be resolved/locked here and is the primary integration risk.)
-# nvidia-curobo = { git = "https://github.com/NVlabs/curobo.git" }
 
-# Add the GPU env alongside dynret's existing `default`/`prod`:
+# Add the gpu env to ~/dynret/pyproject.toml:
 # [tool.pixi.environments]
 # gpu = { features = ["dev", "gpu"], solve-group = "default" }

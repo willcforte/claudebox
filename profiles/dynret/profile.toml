@@ -1,27 +1,22 @@
-# dynret container profile. Read by `claudebox up dynret`. CUDA/torch/aligator/cuRobo install in the
-# pixi layer inside the container (profiles/dynret/pixi/), NOT here and NOT in Nix.
+# dynret claudebox profile (read by `claudebox up dynret`). CUDA/torch install via pixi in the box.
 
 [project]
 name = "dynret"
 image = "claudebox-base:latest"
 
 [claude]
-# Bind host ~/.claude RW (shared memory + auth + writeback). No prompt — set here. Default: true.
-bind = true
+bind = true              # bind host ~/.claude RW (shared memory + auth). Default: true.
 
 [workspace]
-# RW: the dynret repo (pixi env + edits + runs/ land here). Bound 1:1 at this host path.
 host_path = "/home/will/dynret"
 
 [ports]
-# Rerun viewer (9090) + gRPC data proxy (9876). Host binds 0.0.0.0 -> p20 tailscaled serves the tailnet.
-publish = ["9090:9090", "9876:9876"]
+publish = ["9090:9090", "9876:9876"]   # Rerun viewer + gRPC proxy; bound 0.0.0.0 for the tailnet.
 
 [gpu]
-enabled = true   # --gpus all (nvidia runtime). RTX 5090 / Blackwell sm_120.
+enabled = true
 
-# RO mounts. Paths preserved 1:1 so dynret's configs/it1.local.toml absolute paths resolve unchanged
-# (mjcf under persona_rl; BVH under persona). ~/.claude is bound separately (opt-in) by claudebox.
+# RO data, 1:1 so dynret's configs/it1.local.toml absolute paths resolve unchanged.
 [[mounts]]
 host = "/home/will/dev/persona_rl"
 container = "/home/will/dev/persona_rl"

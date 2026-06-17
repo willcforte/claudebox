@@ -1,15 +1,6 @@
 #!/usr/bin/env bash
-# claudebox — build and run reusable sandboxed Claude Code dev containers.
-#
-# Sandbox: non-privileged, NO docker socket; host data RO; repo + ~/.claude bound 1:1 RW (shared
-# memory + writeback); pixi cache persisted. Portable: runs as the HOST uid/gid — nothing hardcoded.
-#
-# Durability: ALL real state lives in HOST bind mounts (the repo, ~/.claude, the pixi cache), never in
-# the container. The box is disposable — stopping it or rebooting p20 loses no work; `up` resumes it.
-# The only real loss vectors are a p20 disk failure with unpushed commits, or work saved to a path
-# inside the container that isn't one of the mounts.
-#
-# Usage: claudebox <build|up|attach|down|status> [project]
+# claudebox — build/run sandboxed Claude Code dev containers. Runs as the host uid/gid (portable);
+# all real state lives in host bind mounts, so the box is disposable. Usage: see usage().
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -24,14 +15,11 @@ profile() {
   [ -f "$t" ] || die "no profile at $t (have: $(ls "$REPO/profiles" 2>/dev/null | tr '\n' ' '))"
   printf '%s' "$t"
 }
-# get <toml> <expr> -> value, or "" if the path is absent (yq prints "null").
 get() { local v; v="$(yq -r "$2" "$1")"; [ "$v" = null ] && v=""; printf '%s' "$v"; }
 
 cmd_build() {
   need nix; need docker
-  echo ">> nix build .#baseImage"
   ( cd "$REPO" && nix "${NIX_FLAGS[@]}" build .#baseImage -o result )
-  echo ">> docker load < result"
   docker load < "$REPO/result"
 }
 
@@ -46,7 +34,6 @@ cmd_up() {
   gpu="$(get "$toml" '.gpu.enabled')"
   claude_bind="$(get "$toml" '.claude.bind')"; [ -n "$claude_bind" ] || claude_bind=true
 
-  # Resume an existing box (survives an accidental stop / p20 reboot; no reconfigure needed).
   if docker inspect "$name" >/dev/null 2>&1; then
     if [ "$(docker inspect -f '{{.State.Running}}' "$name")" = true ]; then
       echo ">> '$name' already up. attach: claudebox attach $name"
@@ -70,15 +57,12 @@ cmd_up() {
     --mount "type=bind,source=$workspace,target=$workspace"
     --mount "type=bind,source=$pixi_cache,target=/home/dev/.pixi"
   )
-  # ~/.claude bind is a profile setting (default true) — no prompt, no extra commands on spin-up.
   [ "$claude_bind" = true ] && args+=(--mount "type=bind,source=$HOME/.claude,target=/home/dev/.claude")
 
-  # RO data mounts, 1:1 by convention.
   while IFS=$'\t' read -r h c; do
     [ -n "$h" ] && args+=(--mount "type=bind,source=$h,target=$c,readonly")
   done < <(yq -r '.mounts[]? | [.host, .container] | @tsv' "$toml")
 
-  # published ports, bound 0.0.0.0 so p20 tailscaled serves the tailnet.
   while read -r p; do
     [ -n "$p" ] && [ "$p" != null ] && args+=(-p "0.0.0.0:$p")
   done < <(yq -r '.ports.publish[]?' "$toml")
