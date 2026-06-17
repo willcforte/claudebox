@@ -47,7 +47,7 @@ cmd_up() {
   [ -n "$workspace" ] || die "profile $proj: workspace.host_path unset"
   [ -d "$workspace" ] || die "workspace not found: $workspace"
   local state="$HOME/.cache/claudebox/$name"
-  mkdir -p "$state/pixi"
+  mkdir -p "$state/pixi" "$state/cache"
 
   local args=(run -d
     --name "$name" --hostname "$name" --label claudebox
@@ -56,6 +56,7 @@ cmd_up() {
     -w "$workspace"
     --mount "type=bind,source=$workspace,target=$workspace"
     --mount "type=bind,source=$state/pixi,target=/home/dev/.pixi"
+    --mount "type=bind,source=$state/cache,target=/home/dev/.cache"
   )
   # Shared ~/.claude dir (memory + auth) + a per-box ~/.claude.json (config), seeded once from the host
   # so claude doesn't warn, kept box-local so host and box never clobber that hot file.

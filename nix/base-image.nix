@@ -53,6 +53,11 @@ pkgs.dockerTools.buildLayeredImage {
       "HOME=/home/dev"
       "LANG=C.UTF-8"
       "PIXI_HOME=/home/dev/.pixi"
+      # /home/dev is read-only (Nix store); cache/data/history go to the writable .cache bind mount.
+      "XDG_CACHE_HOME=/home/dev/.cache"
+      "XDG_DATA_HOME=/home/dev/.cache/data"
+      "XDG_STATE_HOME=/home/dev/.cache/state"
+      "HISTFILE=/home/dev/.cache/bash_history"
       "NVIDIA_VISIBLE_DEVICES=all"
       "NVIDIA_DRIVER_CAPABILITIES=compute,utility"
     ];
