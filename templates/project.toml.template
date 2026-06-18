@@ -8,7 +8,7 @@ image = "claudebox-base:latest"
 bind = true              # bind host ~/.claude RW (shared memory + auth). Default: true.
 
 [workspace]
-host_path = "/home/will/PROJECT_NAME"   # bound 1:1 so Claude's project-memory slug matches the host
+host_path = "/home/youruser/PROJECT_NAME"   # bound 1:1 so Claude's project-memory slug matches the host
 
 [ports]
 publish = []             # e.g. ["9090:9090", "9876:9876"]

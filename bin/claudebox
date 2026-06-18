@@ -116,6 +116,7 @@ cmd_up() {
   [ "$gpu" = true ] && args+=(--gpus all)
   args+=(-e "CLAUDEBOX_NAME=$name" -e "CLAUDEBOX_WORKSPACE=$workspace"
          -e "CLAUDEBOX_GPU=$gpu" -e "CLAUDEBOX_PORTS=${ports_str:-none}"
+         -e "CLAUDEBOX_HOST=${CLAUDEBOX_HOST:-$(hostname)}"
          "$image" sleep infinity)
 
   docker "${args[@]}" >/dev/null

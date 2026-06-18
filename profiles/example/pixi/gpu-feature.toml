@@ -1,4 +1,4 @@
-# dynret GPU overlay (CUDA/torch/cuRobo, runs inside the box). Merge into ~/dynret/pyproject.toml,
+# Example GPU overlay (CUDA/torch/cuRobo, runs inside the box). Merge into your project's pyproject.toml,
 # then `pixi install -e gpu`. Blackwell (RTX 5090, sm_120) needs CUDA>=12.8 + torch cu128. UNVERIFIED.
 
 [tool.pixi.feature.gpu.system-requirements]
@@ -16,6 +16,6 @@ torch = ">=2.7"
 # cuRobo has no cu128 wheel — install from source after torch is verified (primary integration risk):
 #   pixi run pip install --no-build-isolation git+https://github.com/NVlabs/curobo.git
 
-# Add the gpu env to ~/dynret/pyproject.toml:
+# Add the gpu env to your project's pyproject.toml:
 # [tool.pixi.environments]
 # gpu = { features = ["dev", "gpu"], solve-group = "default" }
