@@ -15,6 +15,14 @@
   "remoteUser": "dev",
   "updateRemoteUserUID": true,
   "customizations": {
-    "vscode": { "extensions": ["anthropic.claude-code", "charliermarsh.ruff", "ms-python.python"] }
+    "vscode": {
+      "extensions": ["anthropic.claude-code", "charliermarsh.ruff", "ms-python.python"],
+      "settings": {
+        "python.useEnvironmentsExtension": false,
+        "python.defaultInterpreterPath": "${workspaceFolder}/.pixi/envs/default/bin/python",
+        "python.venvFolders": [],
+        "python.terminal.activateEnvironment": false
+      }
+    }
   }
 }
