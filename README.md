@@ -18,6 +18,22 @@ One reusable base image; one `claudebox` CLI; a thin profile per project.
 reproducible and pinned by content hash, with no layer-ordering or `apt`-drift surprises. That
 reproducibility is uncommon for Docker dev environments.
 
+```text
+                 ▄▄▄▄▄▄▄
+              ▄█████████████▄
+            ▄███████████████████▄
+           █████████████████████████
+           ▀███████████████████████▀
+             ▀▀▀█████████████▀▀▀
+                   ███████
+                   ███████
+                  ▐███████▌
+              ▄▄▄█████████████▄▄▄
+           ▄█████████████████████████▄
+```
+
+> Go ahead--nuke the box. I dare you. `claudebox down && claudebox up` brings it back!
+
 ---
 
 ## Quickstart
