@@ -18,21 +18,11 @@ One reusable base image; one `claudebox` CLI; a thin profile per project.
 reproducible and pinned by content hash, with no layer-ordering or `apt`-drift surprises. That
 reproducibility is uncommon for Docker dev environments.
 
-```text
-                 ▄▄▄▄▄▄▄
-              ▄█████████████▄
-            ▄███████████████████▄
-           █████████████████████████
-           ▀███████████████████████▀
-             ▀▀▀█████████████▀▀▀
-                   ███████
-                   ███████
-                  ▐███████▌
-              ▄▄▄█████████████▄▄▄
-           ▄█████████████████████████▄
-```
+<p align="center">
+  <img src="assets/nuke.svg" alt="mushroom cloud" width="280">
+</p>
 
-> Go ahead--nuke the box. I dare you. `claudebox down && claudebox up` brings it back!
+> Go ahead—nuke the box. I dare you. `claudebox down && claudebox up` brings it back!
 
 ---
 
