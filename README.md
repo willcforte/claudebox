@@ -13,6 +13,27 @@ Sandboxed Docker dev boxes for running **Claude Code in no-prompt auto-mode** wi
 memory. The container is the security boundary; Claude runs unattended without touching the host.
 One reusable base image; one `claudebox` CLI; a thin profile per project.
 
+**Declarative, not a `Dockerfile`.** The base image is built from a pinned Nix flake
+(`flake.nix` + `nix/base-image.nix`, via `dockerTools.buildLayeredImage`) — the whole toolchain is
+reproducible and pinned by content hash, with no layer-ordering or `apt`-drift surprises. That
+reproducibility is uncommon for Docker dev environments.
+
+```text
+                 ▄▄▄▄▄▄▄
+              ▄█████████████▄
+            ▄███████████████████▄
+           █████████████████████████
+           ▀███████████████████████▀
+             ▀▀▀█████████████▀▀▀
+                   ███████
+                   ███████
+                  ▐███████▌
+              ▄▄▄█████████████▄▄▄
+           ▄█████████████████████████▄
+```
+
+> Go ahead--nuke the box. I dare you. `claudebox down && claudebox up` brings it back!
+
 ---
 
 ## Quickstart
@@ -70,8 +91,8 @@ claude                       # auto-mode, sees your shared memory
 | `~/.cache/claudebox/<name>/pixi` | `/home/dev/.pixi` | RW | persisted pixi cache |
 | any `[[mounts]]` entries | same or as configured | RO | extra data the project needs |
 
-> Profiles are user/host-specific (absolute paths). The `dynret` profile ships as an example; copy
-> and edit it for your own project.
+> Profiles are user/host-specific (absolute paths) and are git-ignored. The `example` profile ships
+> as a reference; copy it (or `templates/`) to `profiles/<name>/` and edit it for your own project.
 
 Nothing else of the host is visible.
 
@@ -115,7 +136,8 @@ All real state lives in **host bind mounts**, never in the container:
 ## Set up a new project
 
 ```bash
-# 1. Create the profile
+# 1. Create the profile (or copy profiles/example/ as a filled-in reference)
+mkdir -p profiles/<name>
 cp templates/project.toml.template profiles/<name>/profile.toml
 #    → edit: name, workspace host_path, ports, gpu.enabled, [[mounts]]
 
@@ -138,8 +160,8 @@ claudebox up <name>
 ```
 bin/claudebox                  CLI (build/up/attach/down/status)
 flake.nix, nix/base-image.nix  Nix tooling layered on the pinned FHS CUDA base
-profiles/<name>/               profile.toml, devcontainer.json, pixi/gpu-feature.toml
-profiles/dynret/               example profile
+profiles/<name>/               profile.toml, devcontainer.json, pixi/gpu-feature.toml (git-ignored; local)
+profiles/example/              committed reference profile
 templates/                     project.toml + devcontainer.json templates
 spec/claudebox-design.md       full design rationale
 .claude/research/              nix-docker-cuda-gpu.md — why the base is FHS, not pure Nix
@@ -152,6 +174,9 @@ spec/claudebox-design.md       full design rationale
 - **Git identity in-box:** only `~/.claude` is mounted, not `~/.gitconfig`, so commits made
   inside the box have no author. Add a `~/.gitconfig` mount to the profile if you commit from
   in-box.
+- **Viz URL host:** the banner's `viz` link uses `$CLAUDEBOX_HOST`, defaulting to the host's
+  `hostname`. If your browser reaches the host by a different name (e.g. a Tailscale MagicDNS name),
+  `export CLAUDEBOX_HOST=<that-name>` so the printed URL is reachable.
 - **cuRobo** has no cu128 wheel — install from source after `torch.cuda.get_device_name()`
   confirms the GPU:
   `pixi run pip install --no-build-isolation git+https://github.com/NVlabs/curobo.git`

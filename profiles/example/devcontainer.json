@@ -1,17 +1,17 @@
-// dynret VSCode Dev Containers config. Copy to /home/will/dynret/.devcontainer/devcontainer.json.
+// Example VSCode Dev Containers config. Copy to <repo>/.devcontainer/devcontainer.json and edit paths.
 {
-  "name": "dynret",
+  "name": "example",
   "image": "claudebox-base:latest",
   "workspaceFolder": "${localWorkspaceFolder}",
   "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
   "runArgs": ["--gpus", "all", "-p", "0.0.0.0:9090:9090", "-p", "0.0.0.0:9876:9876"],
   "mounts": [
-    "source=/home/will/dev/persona_rl,target=/home/will/dev/persona_rl,type=bind,readonly",
-    "source=/home/will/dev/persona,target=/home/will/dev/persona,type=bind,readonly",
+    "source=/home/youruser/dev/data-repo-a,target=/home/youruser/dev/data-repo-a,type=bind,readonly",
+    "source=/home/youruser/dev/data-repo-b,target=/home/youruser/dev/data-repo-b,type=bind,readonly",
     "source=${localEnv:HOME}/.claude,target=/home/dev/.claude,type=bind",
-    "source=${localEnv:HOME}/.cache/claudebox/dynret/pixi,target=/home/dev/.pixi,type=bind"
+    "source=${localEnv:HOME}/.cache/claudebox/example/pixi,target=/home/dev/.pixi,type=bind"
   ],
-  "initializeCommand": "mkdir -p ${localEnv:HOME}/.cache/claudebox/dynret/pixi",
+  "initializeCommand": "mkdir -p ${localEnv:HOME}/.cache/claudebox/example/pixi",
   "remoteUser": "dev",
   "updateRemoteUserUID": true,
   "customizations": {

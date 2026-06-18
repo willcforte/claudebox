@@ -25,8 +25,8 @@ and constructs the `docker run` args. No config file outside of profiles and `fl
 - **Bash:** shellcheck-clean. `set -euo pipefail`. Comments only at file/definition head — no
   mid-implementation comments. Terse, self-documenting code.
 - **Nix:** keep base image pin reproducible — digest + TOFU hash in `nix/base-image.nix`.
-- **Profiles:** user/host-specific (absolute paths). Don't generalize them; the `dynret` profile
-  is an example, not a template.
+- **Profiles:** user/host-specific (absolute paths) and git-ignored. Don't commit real profiles; the
+  `example` profile is the committed reference, not a template.
 
 ## Key gotchas
 
@@ -57,5 +57,5 @@ and constructs the `docker run` args. No config file outside of profiles and `fl
 
 ## Current state
 
-Built and working: CLI, GPU base (nvidia/cuda:12.8.1-devel-ubuntu24.04), shell banner, dynret
-profile (Rerun viz on ports 9090/9876, persona_rl + persona RO mounts).
+Built and working: CLI, GPU base (nvidia/cuda:12.8.1-devel-ubuntu24.04), shell banner, example
+profile (Rerun viz on ports 9090/9876, two RO data-repo mounts).

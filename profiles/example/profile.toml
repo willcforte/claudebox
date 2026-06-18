@@ -1,0 +1,27 @@
+# Example claudebox profile (read by `claudebox up example`). Copy to profiles/<name>/profile.toml
+# and edit the paths for your project. CUDA/torch install via pixi inside the box.
+
+[project]
+name = "example"
+image = "claudebox-base:latest"
+
+[claude]
+bind = true              # bind host ~/.claude RW (shared memory + auth). Default: true.
+
+[workspace]
+host_path = "/home/youruser/example"
+
+[ports]
+publish = ["9090:9090", "9876:9876"]   # e.g. Rerun viewer + gRPC proxy; bound 0.0.0.0.
+
+[gpu]
+enabled = true
+
+# RO data, 1:1 so the project's absolute paths resolve unchanged inside the box.
+[[mounts]]
+host = "/home/youruser/dev/data-repo-a"
+container = "/home/youruser/dev/data-repo-a"
+
+[[mounts]]
+host = "/home/youruser/dev/data-repo-b"
+container = "/home/youruser/dev/data-repo-b"

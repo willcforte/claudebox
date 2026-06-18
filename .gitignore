@@ -11,3 +11,7 @@ result-*
 **/*.local.toml
 .env
 *.secret
+
+# per-project profiles are user/host-specific (absolute paths) — keep them local; ship profiles/example
+/profiles/*
+!/profiles/example
