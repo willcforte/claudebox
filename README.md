@@ -13,6 +13,11 @@ Sandboxed Docker dev boxes for running **Claude Code in no-prompt auto-mode** wi
 memory. The container is the security boundary; Claude runs unattended without touching the host.
 One reusable base image; one `claudebox` CLI; a thin profile per project.
 
+**Declarative, not a `Dockerfile`.** The base image is built from a pinned Nix flake
+(`flake.nix` + `nix/base-image.nix`, via `dockerTools.buildLayeredImage`) — the whole toolchain is
+reproducible and pinned by content hash, with no layer-ordering or `apt`-drift surprises. That
+reproducibility is uncommon for Docker dev environments.
+
 ---
 
 ## Quickstart
