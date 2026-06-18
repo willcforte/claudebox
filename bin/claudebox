@@ -7,7 +7,7 @@ REPO="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"  # reso
 NIX_FLAGS=(--extra-experimental-features 'nix-command flakes')
 
 die() { echo "claudebox: $*" >&2; exit 1; }
-usage() { echo "usage: claudebox <build|up|attach|down|status> [project]"; exit "${1:-0}"; }
+usage() { echo "usage: claudebox <build|up|attach|down|status|list> [project]"; exit "${1:-0}"; }
 need() { command -v "$1" >/dev/null || die "missing required tool: $1"; }
 
 profile() {
@@ -127,6 +127,17 @@ cmd_up() {
 cmd_attach() { docker exec -it -e TERM -e COLORTERM "${1:?usage: claudebox attach <project>}" bash; }
 cmd_down()   { docker rm -f "${1:?usage: claudebox down <project>}" >/dev/null && echo ">> '$1' removed"; }
 cmd_status() { docker ps -a --filter label=claudebox --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'; }
+cmd_list() {
+  need yq
+  [ -d "$REPO/profiles" ] || die "no profiles directory at $REPO/profiles"
+  {
+    printf 'PROFILE\tNAME\tWORKSPACE\n'
+    for t in "$REPO/profiles"/*/profile.toml; do
+      [ -f "$t" ] || continue
+      printf '%s\t%s\t%s\n' "$(basename "$(dirname "$t")")" "$(get "$t" '.project.name')" "$(get "$t" '.workspace.host_path')"
+    done
+  } | column -t -s$'\t'
+}
 
 case "${1:-}" in
   build)  cmd_build ;;
@@ -134,6 +145,7 @@ case "${1:-}" in
   attach) shift; cmd_attach "$@" ;;
   down)   shift; cmd_down "$@" ;;
   status) cmd_status ;;
+  list)   cmd_list ;;
   -h|--help|"") usage 0 ;;
   *) usage 1 ;;
 esac
