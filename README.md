@@ -37,8 +37,8 @@ ln -sf ~/dev/claudebox/bin/claudebox ~/.local/bin/claudebox   # ensure ~/.local/
 # build the base image (Nix base + nvidia/cuda; slow first run, then cached)
 claudebox build
 
-# (VSCode only) drop the dev-container config into the project repo
-cp ~/dev/claudebox/profiles/<project>/devcontainer.json ~/<project>/.devcontainer/devcontainer.json
+# (VSCode) the default "Attach to Running Container" needs no per-repo config; only the
+# "Reopen in Container" alternative does (see the VSCode session steps below)
 ```
 
 **Each session — terminal**
@@ -52,9 +52,14 @@ claude                       # auto-mode, sees your shared memory
 
 **Each session — VSCode**
 
-1. VSCode → Remote-SSH → host
-2. Open `~/<project>` → **Reopen in Container**
-3. The box comes up (GPU + shared memory + auto-mode); work normally.
+1. `claudebox up <project>` — start the box (GPU + shared memory + auto-mode)
+2. VSCode → Remote-SSH → host (only if the Docker host is remote)
+3. **Dev Containers: Attach to Running Container** → pick `<project>`
+4. Extensions auto-install via the base-image `devcontainer.metadata` label; work normally.
+
+> Alternative — **Reopen in Container**: needs a per-repo `.devcontainer/devcontainer.json`
+> (see `profiles/example/devcontainer.json` as a reference). The default attach path above
+> needs none of this.
 
 ---
 
@@ -131,7 +136,8 @@ mkdir -p profiles/<name>
 cp templates/project.toml.template profiles/<name>/profile.toml
 #    → edit: name, workspace host_path, ports, gpu.enabled, [[mounts]]
 
-# 2. VSCode dev-container config
+# 2. (Optional) VSCode "Reopen in Container" config — the default "Attach to Running
+#    Container" needs none of this (profiles/example/devcontainer.json is the reference)
 cp templates/devcontainer.json.template profiles/<name>/devcontainer.json
 #    → edit: name, runArgs (ports/gpu), mounts
 cp profiles/<name>/devcontainer.json ~/<name>/.devcontainer/devcontainer.json

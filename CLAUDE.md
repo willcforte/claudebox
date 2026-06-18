@@ -42,7 +42,9 @@ and constructs the `docker run` args. No config file outside of profiles and `fl
   the runtime uid must *also* resolve to a named user — a nameless uid makes VS Code fall back to
   `/root` and fail (`mkdir: cannot create directory '/root'`). The CLI therefore generates a per-box
   `/etc/passwd`+`/etc/group` mapping the host uid to `dev` (home `/home/dev`) and binds them RO. Keep
-  the uid out of the image (`$(id -u)` in the CLI), never a literal.
+  the uid out of the image (`$(id -u)` in the CLI), never a literal. Extensions auto-install on attach
+  via the `devcontainer.metadata` image label (`nix/base-image.nix`) — no per-project
+  `devcontainer.json` needed; settings come from `assets/vscode-machine-settings.json` (CLI-seeded).
 - **Per-box seeded `~/.claude.json`.** The CLI seeds `~/.cache/claudebox/<name>/claude.json`
   once from the host `~/.claude.json`, then binds it at `/home/dev/.claude.json`. This keeps the
   host and box from clobbering each other's hot config file while still giving Claude a valid

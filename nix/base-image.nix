@@ -69,6 +69,19 @@ pkgs.dockerTools.buildLayeredImage {
     ];
     WorkingDir = "/home/dev";
     Cmd = [ "/bin/bash" ];
-    Labels = { "org.opencontainers.image.source" = "claudebox (Nix on nvidia/cuda)"; };
+    # devcontainer.metadata is read by VS Code "Attach to Running Container": it auto-installs these
+    # workspace extensions and resolves the named remote user on every box, every profile/branch.
+    # Settings stay in assets/vscode-machine-settings.json (container-specific, seeded by the CLI).
+    Labels = {
+      "org.opencontainers.image.source" = "claudebox (Nix on nvidia/cuda)";
+      "devcontainer.metadata" = builtins.toJSON [{
+        remoteUser = "dev";
+        customizations.vscode.extensions = [
+          "anthropic.claude-code"
+          "charliermarsh.ruff"
+          "ms-python.python"
+        ];
+      }];
+    };
   };
 }
