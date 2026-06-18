@@ -1,4 +1,13 @@
-# claudebox
+<p align="center">
+  <img src="assets/banner.svg" alt="claudebox" width="640">
+</p>
+
+<p align="center">
+  <img alt="Claude Code: auto-mode" src="https://img.shields.io/badge/Claude_Code-auto--mode-DE784B?logo=anthropic&logoColor=white">
+  <img alt="Nix Flakes" src="https://img.shields.io/badge/Nix-Flakes-5277C3?logo=nixos&logoColor=white">
+  <img alt="Docker: sandboxed" src="https://img.shields.io/badge/Docker-sandboxed-2496ED?logo=docker&logoColor=white">
+  <img alt="CUDA 12.8" src="https://img.shields.io/badge/CUDA-12.8-76B900?logo=nvidia&logoColor=white">
+</p>
 
 Sandboxed Docker dev boxes for running **Claude Code in no-prompt auto-mode** with GPU and shared
 memory. The container is the security boundary; Claude runs unattended without touching the host.
