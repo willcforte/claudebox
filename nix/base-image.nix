@@ -22,6 +22,7 @@ let
     lazygit neovim tmux btop
     shellcheck shfmt
     starship zoxide
+    tectonic
     curl wget cacert
     nodejs
     pixi
