@@ -45,6 +45,14 @@ and constructs the `docker run` args. No config file outside of profiles and `fl
   the uid out of the image (`$(id -u)` in the CLI), never a literal. Extensions auto-install on attach
   via the `devcontainer.metadata` image label (`nix/base-image.nix`) — no per-project
   `devcontainer.json` needed; settings come from `assets/vscode-machine-settings.json` (CLI-seeded).
+  **The label must NOT set `remoteUser`.** On attach there is no `updateRemoteUserUID`, so a baked
+  `remoteUser = "dev"` resolves (`docker exec -u dev`) to the *image's* baked dev uid (1000), not the
+  host uid the CLI ran the box as. If the host uid differs (e.g. 1001) the VS Code server runs as
+  1000 and cannot write the host-owned binds (workspace, `.claude`, `.vscode-server`) →
+  `Permission denied`. With no `remoteUser`, VS Code attaches as the container's numeric `User` (the
+  host uid), which owns those binds; the bound `/etc/passwd` still names it `dev`, so `/root` is
+  avoided. The `devcontainer.json` "Reopen in Container" flow is the exception — it keeps
+  `remoteUser: "dev"` because its `updateRemoteUserUID: true` remaps `dev` to the host uid there.
 - **Per-box seeded `~/.claude.json`.** The CLI seeds `~/.cache/claudebox/<name>/claude.json`
   once from the host `~/.claude.json`, then binds it at `/home/dev/.claude.json`. This keeps the
   host and box from clobbering each other's hot config file while still giving Claude a valid

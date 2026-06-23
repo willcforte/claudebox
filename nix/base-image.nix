@@ -70,12 +70,13 @@ pkgs.dockerTools.buildLayeredImage {
     WorkingDir = "/home/dev";
     Cmd = [ "/bin/bash" ];
     # devcontainer.metadata is read by VS Code "Attach to Running Container": it auto-installs these
-    # workspace extensions and resolves the named remote user on every box, every profile/branch.
+    # workspace extensions. No remoteUser — VS Code then attaches as the container's numeric User
+    # (the host uid set by the CLI), which owns the host binds; a baked name resolves to the image's
+    # uid (1000) and cannot write a host home owned by a different uid.
     # Settings stay in assets/vscode-machine-settings.json (container-specific, seeded by the CLI).
     Labels = {
       "org.opencontainers.image.source" = "claudebox (Nix on nvidia/cuda)";
       "devcontainer.metadata" = builtins.toJSON [{
-        remoteUser = "dev";
         customizations.vscode.extensions = [
           "anthropic.claude-code"
           "charliermarsh.ruff"
