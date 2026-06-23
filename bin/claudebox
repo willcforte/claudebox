@@ -97,6 +97,13 @@ cmd_up() {
     [ -f "$state/claude.json" ] || cp "$HOME/.claude.json" "$state/claude.json" 2>/dev/null || echo '{}' > "$state/claude.json"
     args+=(--mount "type=bind,source=$HOME/.claude,target=/home/dev/.claude"
            --mount "type=bind,source=$state/claude.json,target=/home/dev/.claude.json")
+    [ -d "$HOME/.claude-private" ] &&
+      args+=(--mount "type=bind,source=$HOME/.claude-private,target=/home/dev/.claude-private")
+    while IFS= read -r -d '' link; do
+      real="$(readlink -f "$link")" && [ -e "$real" ] || continue
+      case "$real" in "$HOME/.claude"/*) continue ;; esac
+      args+=(--mount "type=bind,source=$real,target=/home/dev/.claude/${link#"$HOME/.claude/"},readonly")
+    done < <(find "$HOME/.claude" -type l -print0 2>/dev/null)
   fi
 
   local ports_str=""
