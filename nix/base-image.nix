@@ -67,7 +67,7 @@ pkgs.dockerTools.buildLayeredImage {
       "XDG_STATE_HOME=/home/dev/.cache/state"
       "HISTFILE=/home/dev/.cache/bash_history"
       "NVIDIA_VISIBLE_DEVICES=all"
-      "NVIDIA_DRIVER_CAPABILITIES=all"
+      "NVIDIA_DRIVER_CAPABILITIES=compute,utility"
     ];
     WorkingDir = "/home/dev";
     Cmd = [ "/bin/bash" ];

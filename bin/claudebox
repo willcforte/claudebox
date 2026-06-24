@@ -37,7 +37,7 @@ cmd_up() {
   done
 
   # No project: box the current directory with working defaults; a profile fills these from its TOML.
-  local name="" image="" workspace="" gpu="" claude_bind="" toml=""
+  local name="" image="" workspace="" gpu="" gpu_cuda="" gpu_graphics="" claude_bind="" toml=""
   workspace="$PWD"; name="$(basename "$PWD")"
   if [ -n "$proj" ]; then
     need yq
@@ -45,12 +45,16 @@ cmd_up() {
     name="$(get "$toml" '.project.name')"
     image="$(get "$toml" '.project.image')"
     workspace="$(get "$toml" '.workspace.host_path')"
-    gpu="$(get "$toml" '.gpu.enabled')"
+    gpu="$(get "$toml" '.gpu.passthrough')"
+    gpu_cuda="$(get "$toml" '.gpu.cuda')"
+    gpu_graphics="$(get "$toml" '.gpu.graphics')"
     claude_bind="$(get "$toml" '.claude.bind')"
   fi
   [ -n "$name_override" ] && name="$name_override"
   [ -n "$image" ] || image="claudebox-base:latest"
   [ -n "$gpu" ] || gpu=false
+  [ -n "$gpu_cuda" ] || gpu_cuda=true
+  [ -n "$gpu_graphics" ] || gpu_graphics=false
   [ -n "$claude_bind" ] || claude_bind=true
 
   if docker container inspect "$name" >/dev/null 2>&1; then
@@ -113,7 +117,13 @@ cmd_up() {
     done < <(yq -r '.ports.publish[]?' "$toml")
   fi
 
-  [ "$gpu" = true ] && args+=(--gpus all)
+  if [ "$gpu" = true ]; then
+    args+=(--gpus all)
+    local caps=""
+    [ "$gpu_cuda" = true ] && caps="compute,utility"
+    [ "$gpu_graphics" = true ] && caps="${caps:+$caps,}graphics"
+    [ -n "$caps" ] && args+=(-e "NVIDIA_DRIVER_CAPABILITIES=$caps")
+  fi
   args+=(-e "CLAUDEBOX_NAME=$name" -e "CLAUDEBOX_WORKSPACE=$workspace"
          -e "CLAUDEBOX_GPU=$gpu" -e "CLAUDEBOX_PORTS=${ports_str:-none}"
          -e "CLAUDEBOX_HOST=${CLAUDEBOX_HOST:-$(hostname)}"

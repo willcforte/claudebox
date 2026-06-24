@@ -14,7 +14,9 @@ host_path = "/home/youruser/PROJECT_NAME"   # bound 1:1 so Claude's project-memo
 publish = []             # e.g. ["9090:9090", "9876:9876"]
 
 [gpu]
-enabled = false
+passthrough = false      # --gpus all (attach the device). Default: false.
+cuda = true              # inject compute,utility (CUDA/torch). Default: true.
+graphics = false         # also inject graphics (EGL/GLX headless render, e.g. MuJoCo MUJOCO_GL=egl). Default: false.
 
 [[mounts]]               # RO data, 1:1
 host = "/abs/host/path"

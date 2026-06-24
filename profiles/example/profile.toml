@@ -15,7 +15,9 @@ host_path = "/home/youruser/example"
 publish = ["9090:9090", "9876:9876"]   # e.g. Rerun viewer + gRPC proxy; bound 0.0.0.0.
 
 [gpu]
-enabled = true
+passthrough = true       # --gpus all (attach the device). Default: false.
+cuda = true              # inject compute,utility (CUDA/torch). Default: true.
+graphics = false         # also inject graphics (EGL/GLX headless render, e.g. MuJoCo MUJOCO_GL=egl). Default: false.
 
 # RO data, 1:1 so the project's absolute paths resolve unchanged inside the box.
 [[mounts]]

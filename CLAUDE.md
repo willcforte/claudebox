@@ -56,14 +56,20 @@ and constructs the `docker run` args. No config file outside of profiles and `fl
   both. Set `hash = pkgs.lib.fakeHash` to let Nix report the real hash on first build.
 - **Build via `claudebox build`, not `docker build`.** The build path is
   `nix build .#baseImage` → `docker load < result`.
-- **Headless GL (EGL/GLX) needs two things, not just the device.** `--gpus all` passes the device
-  but the NVIDIA runtime injects the *graphics* userspace (`libEGL_nvidia`, `libGLX_nvidia`) only
-  when `NVIDIA_DRIVER_CAPABILITIES` includes `graphics` — so the image sets it to `all`. That alone
-  is still insufficient: the glvnd dispatch loader (`libEGL.so.1`, e.g. from a project's pixi env)
-  enumerates vendors via `/usr/share/glvnd/egl_vendor.d/*.json`, which the runtime does **not**
-  inject. The image therefore bakes `10_nvidia.json` (pointing at `libEGL_nvidia.so.0`) in
-  `rootfsSetup`. Symptom when either is missing: MuJoCo `MUJOCO_GL=egl` fails with "driver does not
-  support the PLATFORM_DEVICE extension" / `eglInitialize` result 0, even though `nvidia-smi` works.
+- **Headless GL (EGL/GLX) is an opt-in toggle, and needs two things beyond the device.** `--gpus all`
+  passes the device, but the NVIDIA runtime injects the *graphics* userspace (`libEGL_nvidia`,
+  `libGLX_nvidia`) only when `NVIDIA_DRIVER_CAPABILITIES` includes `graphics`. That alone is still
+  insufficient: the glvnd dispatch loader (`libEGL.so.1`, e.g. from a project's pixi env) enumerates
+  vendors via `/usr/share/glvnd/egl_vendor.d/*.json`, which the runtime does **not** inject — so the
+  image bakes `10_nvidia.json` (pointing at `libEGL_nvidia.so.0`) in `rootfsSetup` unconditionally
+  (inert without the caps + libs). Capabilities are composed from two per-profile booleans under
+  `[gpu]` — `cuda` (default true → `compute,utility`) and `graphics` (default false → adds
+  `graphics`) — and the CLI passes their union as `-e NVIDIA_DRIVER_CAPABILITIES=...` at `docker run`
+  (one base image serves every mode; `gpu.passthrough` only attaches the device via `--gpus all`).
+  The image bakes `compute,utility` as a standalone fallback for direct `docker run`. Symptom when
+  graphics is off or a piece is missing:
+  MuJoCo `MUJOCO_GL=egl` fails with "driver does not support the PLATFORM_DEVICE extension" /
+  `eglInitialize` result 0, even though `nvidia-smi` works.
 
 ## Current state
 
