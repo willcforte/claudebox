@@ -83,6 +83,11 @@ cmd_up() {
   # so Python tooling works without manual per-box setup and extensions survive recreation.
   cp "$REPO/assets/vscode-machine-settings.json" "$state/vscode-server/data/Machine/settings.json"
 
+  # VS Code's per-commit connection token is mode 0400 on the persisted mount; a uid change makes it
+  # unreadable and un-overwritable (Permission denied on attach). Prune so it regenerates per session.
+  rm -f "$state/vscode-server/data/Machine/.connection-token-"* \
+        "$state/vscode-server/data/Machine/.devport-"* 2>/dev/null || true
+
   local args=(run -d
     --name "$name" --hostname "$name" --label claudebox
     --user "$uid:$gid"
