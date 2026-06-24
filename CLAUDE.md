@@ -56,6 +56,14 @@ and constructs the `docker run` args. No config file outside of profiles and `fl
   both. Set `hash = pkgs.lib.fakeHash` to let Nix report the real hash on first build.
 - **Build via `claudebox build`, not `docker build`.** The build path is
   `nix build .#baseImage` → `docker load < result`.
+- **Headless GL (EGL/GLX) needs two things, not just the device.** `--gpus all` passes the device
+  but the NVIDIA runtime injects the *graphics* userspace (`libEGL_nvidia`, `libGLX_nvidia`) only
+  when `NVIDIA_DRIVER_CAPABILITIES` includes `graphics` — so the image sets it to `all`. That alone
+  is still insufficient: the glvnd dispatch loader (`libEGL.so.1`, e.g. from a project's pixi env)
+  enumerates vendors via `/usr/share/glvnd/egl_vendor.d/*.json`, which the runtime does **not**
+  inject. The image therefore bakes `10_nvidia.json` (pointing at `libEGL_nvidia.so.0`) in
+  `rootfsSetup`. Symptom when either is missing: MuJoCo `MUJOCO_GL=egl` fails with "driver does not
+  support the PLATFORM_DEVICE extension" / `eglInitialize` result 0, even though `nvidia-smi` works.
 
 ## Current state
 

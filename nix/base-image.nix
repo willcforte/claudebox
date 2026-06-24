@@ -29,7 +29,9 @@ let
     claude-code
   ];
   rootfsSetup = pkgs.runCommand "rootfs-setup" { } ''
-    mkdir -p $out/etc/claude-code $out/etc/claudebox $out/home/dev
+    mkdir -p $out/etc/claude-code $out/etc/claudebox $out/home/dev $out/usr/share/glvnd/egl_vendor.d
+    echo '{"file_format_version":"1.0.0","ICD":{"library_path":"libEGL_nvidia.so.0"}}' \
+      > $out/usr/share/glvnd/egl_vendor.d/10_nvidia.json
     echo "root:x:0:0:root:/root:/bin/bash" > $out/etc/passwd
     echo "dev:x:1000:1000:dev:/home/dev:/bin/bash" >> $out/etc/passwd
     echo "root:x:0:" > $out/etc/group
@@ -65,7 +67,7 @@ pkgs.dockerTools.buildLayeredImage {
       "XDG_STATE_HOME=/home/dev/.cache/state"
       "HISTFILE=/home/dev/.cache/bash_history"
       "NVIDIA_VISIBLE_DEVICES=all"
-      "NVIDIA_DRIVER_CAPABILITIES=compute,utility"
+      "NVIDIA_DRIVER_CAPABILITIES=all"
     ];
     WorkingDir = "/home/dev";
     Cmd = [ "/bin/bash" ];
