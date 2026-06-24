@@ -72,12 +72,14 @@ pkgs.dockerTools.buildLayeredImage {
     WorkingDir = "/home/dev";
     Cmd = [ "/bin/bash" ];
     # devcontainer.metadata is read by VS Code "Attach to Running Container": it auto-installs these
-    # workspace extensions and resolves the named remote user on every box, every profile/branch.
-    # Settings stay in assets/vscode-machine-settings.json (container-specific, seeded by the CLI).
+    # workspace extensions on every box, every profile/branch. No remoteUser here on purpose — attach
+    # then falls back to the running container's numeric Config.User (the CLI's --user "$(id -u):...")
+    # so the exec uid matches the .vscode-server cache on any host. A baked remoteUser="dev" resolves
+    # via the image's /etc/passwd (uid 1000), bypassing the CLI's RO passwd bind, and breaks attach
+    # whenever the host uid != 1000. Settings stay in assets/vscode-machine-settings.json (CLI-seeded).
     Labels = {
       "org.opencontainers.image.source" = "claudebox (Nix on nvidia/cuda)";
       "devcontainer.metadata" = builtins.toJSON [{
-        remoteUser = "dev";
         customizations.vscode.extensions = [
           "anthropic.claude-code"
           "charliermarsh.ruff"
