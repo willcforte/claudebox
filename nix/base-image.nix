@@ -16,7 +16,7 @@ let
   # coreutils/bash/binSh included so /bin is self-sufficient over the Ubuntu base (merged-/usr safety).
   tools = with pkgs; [
     coreutils bashInteractive gnused gnugrep gawk gnutar gzip findutils which
-    git gh
+    git gh rtk
     ripgrep fd bat fzf tree lsd dust procs tldr
     ast-grep yq-go jq
     lazygit neovim tmux btop
