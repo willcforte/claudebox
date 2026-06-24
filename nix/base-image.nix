@@ -37,9 +37,10 @@ let
     echo "root:x:0:" > $out/etc/group
     echo "dev:x:1000:" >> $out/etc/group
     echo '{"permissions":{"defaultMode":"bypassPermissions"}}' > $out/etc/claude-code/managed-settings.json
-    cp ${../assets/banner.sh} $out/etc/claudebox/banner.sh
-    cp ${../assets/bashrc}    $out/home/dev/.bashrc
-    chmod 0644 $out/etc/claudebox/banner.sh $out/home/dev/.bashrc
+    cp ${../assets/banner.sh}   $out/etc/claudebox/banner.sh
+    cp ${../assets/activate.sh} $out/etc/claudebox/activate.sh
+    cp ${../assets/bashrc}      $out/home/dev/.bashrc
+    chmod 0644 $out/etc/claudebox/banner.sh $out/etc/claudebox/activate.sh $out/home/dev/.bashrc
   '';
 in
 pkgs.dockerTools.buildLayeredImage {
@@ -61,6 +62,10 @@ pkgs.dockerTools.buildLayeredImage {
       "HOME=/home/dev"
       "LANG=C.UTF-8"
       "PIXI_HOME=/home/dev/.pixi"
+      # Non-interactive `bash -c` (Claude's Bash tool, VS Code tasks) reads BASH_ENV; this auto-activates
+      # a pixi env from CWD so PYTHONPATH et al. are set without `pixi run`. Interactive shells ignore
+      # BASH_ENV and source the same script from .bashrc instead.
+      "BASH_ENV=/etc/claudebox/activate.sh"
       # /home/dev is world-writable (fakeRootCommands); cache/data/history go to the .cache bind mount so they persist across box recreation.
       "XDG_CACHE_HOME=/home/dev/.cache"
       "XDG_DATA_HOME=/home/dev/.cache/data"
