@@ -79,6 +79,14 @@ and constructs the `docker run` args. No config file outside of profiles and `fl
   MuJoCo `MUJOCO_GL=egl` fails with "driver does not support the PLATFORM_DEVICE extension" /
   `eglInitialize` result 0, even though `nvidia-smi` works.
 
+- **Pixi env auto-activates via `BASH_ENV`.** `pixi`'s `[activation.env]` (e.g. `PYTHONPATH=$PIXI_PROJECT_ROOT/src`)
+  reaches a process only through an evaluated `shell-hook`. Interactive `.bashrc` alone misses Claude's Bash
+  tool and VS Code tasks, which run non-interactive `bash -c` (no `.bashrc`). The image sets
+  `BASH_ENV=/etc/claudebox/activate.sh` (read by non-interactive bash) and `.bashrc` sources the same script
+  (interactive bash ignores `BASH_ENV`). The script evals `pixi shell-hook` from CWD, guarded by an exported
+  `CLAUDEBOX_PIXI_ACTIVATED` set *before* the hook runs so bash spawned by pixi short-circuits (no recursion).
+  No-op outside a pixi project. Existing boxes must be recreated (`claudebox down/up`) to pick this up.
+
 ## Current state
 
 Built and working: CLI, GPU base (nvidia/cuda:12.8.1-devel-ubuntu24.04), shell banner, example

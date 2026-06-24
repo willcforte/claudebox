@@ -1,7 +1,8 @@
 # shellcheck shell=bash
 # claudebox interactive shell rc (baked to /home/dev/.bashrc).
 mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}" "${XDG_DATA_HOME:-$HOME/.local/share}" "${XDG_STATE_HOME:-$HOME/.local/state}" 2>/dev/null
-[ -f /etc/claudebox/banner.sh ] && . /etc/claudebox/banner.sh
+[ -f /etc/claudebox/banner.sh ]   && . /etc/claudebox/banner.sh
+[ -f /etc/claudebox/activate.sh ] && . /etc/claudebox/activate.sh
 command -v starship >/dev/null 2>&1 && eval "$(starship init bash)"
 command -v zoxide   >/dev/null 2>&1 && eval "$(zoxide init bash)"
 alias ls='ls --color=auto'
