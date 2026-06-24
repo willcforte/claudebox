@@ -86,6 +86,11 @@ and constructs the `docker run` args. No config file outside of profiles and `fl
   (interactive bash ignores `BASH_ENV`). The script evals `pixi shell-hook` from CWD, guarded by an exported
   `CLAUDEBOX_PIXI_ACTIVATED` set *before* the hook runs so bash spawned by pixi short-circuits (no recursion).
   No-op outside a pixi project. Existing boxes must be recreated (`claudebox down/up`) to pick this up.
+  `pixi shell-hook` also defines a `pixi()` wrapper that calls `"$PIXI_EXE"`; Claude's Bash tool sources
+  a shell *snapshot* that captures functions but not env vars, so without `PIXI_EXE` set the wrapper runs
+  an empty command (exit 127) and its trailing `return 0` masks the failure (silent no-op `install` etc.).
+  `PIXI_EXE=${pkgs.pixi}/bin/pixi` is therefore baked into `config.Env` (`nix/base-image.nix`) so it is
+  always present, snapshot or not.
 
 ## Current state
 

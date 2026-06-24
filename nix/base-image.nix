@@ -62,6 +62,9 @@ pkgs.dockerTools.buildLayeredImage {
       "HOME=/home/dev"
       "LANG=C.UTF-8"
       "PIXI_HOME=/home/dev/.pixi"
+      # pixi's shell-hook defines a pixi() wrapper that calls "$PIXI_EXE"; Claude's Bash tool sources
+      # a shell snapshot capturing functions but not env vars, so PIXI_EXE must be in the base env.
+      "PIXI_EXE=${pkgs.pixi}/bin/pixi"
       # Non-interactive `bash -c` (Claude's Bash tool, VS Code tasks) reads BASH_ENV; this auto-activates
       # a pixi env from CWD so PYTHONPATH et al. are set without `pixi run`. Interactive shells ignore
       # BASH_ENV and source the same script from .bashrc instead.
