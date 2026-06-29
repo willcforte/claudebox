@@ -92,6 +92,16 @@ and constructs the `docker run` args. No config file outside of profiles and `fl
   `PIXI_EXE=${pkgs.pixi}/bin/pixi` is therefore baked into `config.Env` (`nix/base-image.nix`) so it is
   always present, snapshot or not.
 
+- **VS Code requirements check is bypassed image-wide.** The image bakes an empty
+  `/tmp/vscode-skip-server-requirements-check` (via `fakeRootCommands`, which also restores `/tmp` to
+  `1777` — the fakechroot layer lacks the base's `/tmp`, so it is recreated there). VS Code's
+  `check-requirements-linux.sh` exits 0 when that file exists, so the server attaches on any host
+  regardless of the host's glibc/libstdc++. This is safe because the `ubuntu24.04` base genuinely
+  meets the requirement (glibc 2.39) — it silences a check that should not trip, not a missing lib.
+  It does **not** fix a `Permission denied` on `/home/dev/.vscode-server`; that is a uid-ownership
+  problem (the persisted bind `~/.cache/claudebox/<name>/vscode-server` must be owned by the runtime
+  uid), not a requirements-check failure.
+
 ## Current state
 
 Built and working: CLI, GPU base (nvidia/cuda:12.8.1-devel-ubuntu24.04), shell banner, example

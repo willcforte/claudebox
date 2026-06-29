@@ -50,7 +50,14 @@ pkgs.dockerTools.buildLayeredImage {
   # A `chmod` in the runCommand store path is canonicalized back to root:root 0755, so make
   # /home/dev world-writable here (post-assembly, under fakechroot) — the box runs as an arbitrary
   # host uid that must write its home (e.g. .vscode-server for VS Code Dev Containers attach).
-  fakeRootCommands = "chmod 0777 /home/dev";
+  # /home/dev world-writable for the arbitrary host uid; the skip file makes VS Code's
+  # check-requirements-linux.sh exit 0 on any host (the ubuntu24.04 base genuinely meets the glibc
+  # requirement, so this silences a check that should not trip rather than hiding a missing lib).
+  fakeRootCommands = ''
+    chmod 0777 /home/dev
+    mkdir -p /tmp && chmod 1777 /tmp
+    touch /tmp/vscode-skip-server-requirements-check
+  '';
   enableFakechroot = true;
   config = {
     User = "dev";
