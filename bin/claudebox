@@ -37,7 +37,7 @@ cmd_up() {
   done
 
   # No project: box the current directory with working defaults; a profile fills these from its TOML.
-  local name="" image="" workspace="" gpu="" gpu_cuda="" gpu_graphics="" claude_bind="" ssh_fwd="" toml=""
+  local name="" image="" workspace="" box_workdir="" gpu="" gpu_cuda="" gpu_graphics="" claude_bind="" ssh_fwd="" toml=""
   workspace="$PWD"; name="$(basename "$PWD")"
   if [ -n "$proj" ]; then
     need tomlq
@@ -45,6 +45,7 @@ cmd_up() {
     name="$(get "$toml" '.project.name')"
     image="$(get "$toml" '.project.image')"
     workspace="$(get "$toml" '.workspace.host_path')"
+    box_workdir="$(get "$toml" '.workspace.container_path')"
     gpu="$(get "$toml" '.gpu.passthrough')"
     gpu_cuda="$(get "$toml" '.gpu.cuda')"
     gpu_graphics="$(get "$toml" '.gpu.graphics')"
@@ -69,8 +70,17 @@ cmd_up() {
     return 0
   fi
 
-  [ -n "$workspace" ] || die "profile $proj: workspace.host_path unset"
-  [ -d "$workspace" ] || die "workspace not found: $workspace"
+  # [workspace] sets where the box lands. host_path: bind that host dir and cd there. container_path:
+  # cd to an existing in-box path (e.g. a [[mounts]] target), no self-mount. Neither: container ~.
+  local workdir=""
+  if [ -n "$workspace" ]; then
+    [ -d "$workspace" ] || die "workspace not found: $workspace"
+    workdir="$workspace"
+  elif [ -n "$box_workdir" ]; then
+    workdir="$box_workdir"
+  else
+    workdir="/home/dev"
+  fi
   local state="$HOME/.cache/claudebox/$name"
   mkdir -p "$state/pixi" "$state/cache" "$state/vscode-server/data/Machine"
 
@@ -93,14 +103,14 @@ cmd_up() {
     --name "$name" --hostname "$name" --label claudebox
     --user "$uid:$gid"
     --security-opt no-new-privileges --cap-drop ALL
-    -w "$workspace"
-    --mount "type=bind,source=$workspace,target=$workspace"
+    -w "$workdir"
     --mount "type=bind,source=$state/passwd,target=/etc/passwd,readonly"
     --mount "type=bind,source=$state/group,target=/etc/group,readonly"
     --mount "type=bind,source=$state/pixi,target=/home/dev/.pixi"
     --mount "type=bind,source=$state/cache,target=/home/dev/.cache"
     --mount "type=bind,source=$state/vscode-server,target=/home/dev/.vscode-server"
   )
+  [ -n "$workspace" ] && args+=(--mount "type=bind,source=$workspace,target=$workspace")
   # Shared ~/.claude dir (memory + auth) + a per-box ~/.claude.json (config), seeded once from the host
   # so claude doesn't warn, kept box-local so host and box never clobber that hot file.
   if [ "$claude_bind" = true ]; then
@@ -148,7 +158,7 @@ cmd_up() {
     [ "$gpu_graphics" = true ] && caps="${caps:+$caps,}graphics"
     [ -n "$caps" ] && args+=(-e "NVIDIA_DRIVER_CAPABILITIES=$caps")
   fi
-  args+=(-e "CLAUDEBOX_NAME=$name" -e "CLAUDEBOX_WORKSPACE=$workspace"
+  args+=(-e "CLAUDEBOX_NAME=$name" -e "CLAUDEBOX_WORKSPACE=$workdir"
          -e "CLAUDEBOX_GPU=$gpu" -e "CLAUDEBOX_PORTS=${ports_str:-none}"
          -e "CLAUDEBOX_HOST=${CLAUDEBOX_HOST:-$(hostname)}"
          "$image" sleep infinity)
