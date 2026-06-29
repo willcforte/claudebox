@@ -15,7 +15,7 @@ profile() {
   [ -f "$t" ] || die "no profile at $t (have: $(ls "$REPO/profiles" 2>/dev/null | tr '\n' ' '))"
   printf '%s' "$t"
 }
-get() { local v; v="$(yq -r "$2" "$1")"; [ "$v" = null ] && v=""; printf '%s' "$v"; }
+get() { local v; v="$(tomlq -r "$2" "$1")"; [ "$v" = null ] && v=""; printf '%s' "$v"; }
 
 cmd_build() {
   need nix; need docker
@@ -37,10 +37,10 @@ cmd_up() {
   done
 
   # No project: box the current directory with working defaults; a profile fills these from its TOML.
-  local name="" image="" workspace="" gpu="" gpu_cuda="" gpu_graphics="" claude_bind="" toml=""
+  local name="" image="" workspace="" gpu="" gpu_cuda="" gpu_graphics="" claude_bind="" ssh_fwd="" toml=""
   workspace="$PWD"; name="$(basename "$PWD")"
   if [ -n "$proj" ]; then
-    need yq
+    need tomlq
     toml="$(profile "$proj")"
     name="$(get "$toml" '.project.name')"
     image="$(get "$toml" '.project.image')"
@@ -49,6 +49,7 @@ cmd_up() {
     gpu_cuda="$(get "$toml" '.gpu.cuda')"
     gpu_graphics="$(get "$toml" '.gpu.graphics')"
     claude_bind="$(get "$toml" '.claude.bind')"
+    ssh_fwd="$(get "$toml" '.ssh.forward_agent')"
   fi
   [ -n "$name_override" ] && name="$name_override"
   [ -n "$image" ] || image="claudebox-base:latest"
@@ -117,16 +118,27 @@ cmd_up() {
 
   local ports_str=""
   if [ -n "$toml" ]; then
-    while IFS=$'\t' read -r h c; do
-      [ -n "$h" ] && args+=(--mount "type=bind,source=$h,target=$c,readonly")
-    done < <(yq -r '.mounts[]? | [.host, .container] | @tsv' "$toml")
+    while IFS=$'\t' read -r h c ro; do
+      [ -n "$h" ] || continue
+      local mspec="type=bind,source=$h,target=$c"
+      [ "$ro" = true ] && mspec="$mspec,readonly"
+      args+=(--mount "$mspec")
+    done < <(tomlq -r '.mounts[]? | [.host, .container, (if .readonly == null then true else .readonly end | tostring)] | @tsv' "$toml")
 
     while read -r p; do
       if [ -n "$p" ] && [ "$p" != null ]; then
         args+=(-p "0.0.0.0:$p")
         ports_str="${ports_str:+$ports_str, }${p%%:*}"
       fi
-    done < <(yq -r '.ports.publish[]?' "$toml")
+    done < <(tomlq -r '.ports.publish[]?' "$toml")
+  fi
+
+  if [ "$ssh_fwd" = true ]; then
+    [ -d "$HOME/.ssh" ] && args+=(--mount "type=bind,source=$HOME/.ssh,target=/home/dev/.ssh,readonly")
+    if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "$SSH_AUTH_SOCK" ]; then
+      args+=(--mount "type=bind,source=$SSH_AUTH_SOCK,target=/run/ssh-auth.sock"
+             -e "SSH_AUTH_SOCK=/run/ssh-auth.sock")
+    fi
   fi
 
   if [ "$gpu" = true ]; then
@@ -150,7 +162,7 @@ cmd_attach() { docker exec -it -e TERM -e COLORTERM "${1:?usage: claudebox attac
 cmd_down()   { docker rm -f "${1:?usage: claudebox down <project>}" >/dev/null && echo ">> '$1' removed"; }
 cmd_status() { docker ps -a --filter label=claudebox --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'; }
 cmd_list() {
-  need yq
+  need tomlq
   [ -d "$REPO/profiles" ] || die "no profiles directory at $REPO/profiles"
   {
     printf 'PROFILE\tNAME\tWORKSPACE\n'
