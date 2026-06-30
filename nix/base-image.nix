@@ -20,7 +20,8 @@ let
     ripgrep fd bat fzf tree lsd dust procs tldr
     ast-grep yq-go jq
     lazygit neovim tmux btop
-    shellcheck shfmt
+    shellcheck shfmt bats
+    nix
     starship zoxide
     tectonic
     curl wget cacert
